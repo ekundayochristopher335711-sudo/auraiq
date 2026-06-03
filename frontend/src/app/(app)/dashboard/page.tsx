@@ -1,6 +1,8 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bell, Search, Flame, BookOpen, Target, Zap } from "lucide-react";
+import { Bell, Search, Flame, BookOpen, Target, Zap, Upload, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
 import { ExamReadinessCard } from "@/components/dashboard/ExamReadinessCard";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { WeaknessHeatmap } from "@/components/dashboard/WeaknessHeatmap";
@@ -52,18 +54,68 @@ const MOCK_SUBJECTS: Subject[] = [
 ];
 
 export default function DashboardPage() {
-  const [data, setData] = useState<DashboardData>(MOCK_DASHBOARD);
-  const [subjects, setSubjects] = useState<Subject[]>(MOCK_SUBJECTS);
+  const [data, setData]           = useState<DashboardData>(MOCK_DASHBOARD);
+  const [subjects, setSubjects]   = useState<Subject[]>(MOCK_SUBJECTS);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [realSubjects, setRealSubjects]     = useState<Subject[] | null>(null);
 
   useEffect(() => {
     api.dashboard.get().then(setData).catch(() => {});
-    api.subjects.list().then(setSubjects).catch(() => {});
+    api.subjects.list()
+      .then((s) => { setSubjects(s); setRealSubjects(s); })
+      .catch(() => { setRealSubjects([]); });
   }, []);
+
+  useEffect(() => {
+    if (realSubjects !== null && realSubjects.length === 0) {
+      const seen = localStorage.getItem("auraiq_onboarded");
+      if (!seen) setShowOnboarding(true);
+    }
+  }, [realSubjects]);
+
+  const dismissOnboarding = () => {
+    localStorage.setItem("auraiq_onboarded", "1");
+    setShowOnboarding(false);
+  };
 
   const { stats, topic_scores, forgetting_forecasts, performance_trend } = data;
 
+  const isNewUser = realSubjects !== null && realSubjects.length === 0;
+
   return (
     <div className="p-6 space-y-6 min-h-full">
+      {showOnboarding && <OnboardingModal onDismiss={dismissOnboarding} />}
+
+      {/* Empty state for new users */}
+      {isNewUser && (
+        <div className="rounded-2xl bg-[#141414] border border-violet-500/20 p-8 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
+            <Upload size={28} className="text-violet-400" />
+          </div>
+          <h2 className="text-lg font-bold text-white mb-2">Welcome to AuraIQ!</h2>
+          <p className="text-sm text-gray-400 max-w-sm mx-auto mb-6 leading-relaxed">
+            Upload your first study document to get started. AI will extract modules, concepts, and flashcards automatically.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link href="/subjects" className="flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl px-6 py-2.5 transition-colors">
+              <BookOpen size={15} /> Create your first subject <ArrowRight size={14} />
+            </Link>
+          </div>
+          <div className="grid grid-cols-3 gap-4 mt-8 text-left">
+            {[
+              { n: "1", title: "Create a subject", desc: "Name your study topic or exam" },
+              { n: "2", title: "Upload a document", desc: "PDF, DOCX, or TXT — up to 20MB" },
+              { n: "3", title: "Start reviewing",   desc: "AI flashcards generated instantly" },
+            ].map(({ n, title, desc }) => (
+              <div key={n} className="bg-white/3 rounded-xl p-4">
+                <div className="w-6 h-6 rounded-full bg-violet-500/20 text-violet-400 text-xs font-bold flex items-center justify-center mb-2">{n}</div>
+                <p className="text-sm font-medium text-white mb-1">{title}</p>
+                <p className="text-xs text-gray-500">{desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>

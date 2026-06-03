@@ -4,11 +4,11 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import engine, Base
 
-# Import all models so Base.metadata is populated before create_all
 import app.models.user       # noqa: F401
 import app.models.subject    # noqa: F401
 import app.models.flashcard  # noqa: F401
 import app.models.session    # noqa: F401
+import app.models.otp        # noqa: F401
 
 from app.api.routes import auth, subjects, flashcards, sessions, mastery, ai, upload
 
@@ -18,7 +18,6 @@ async def lifespan(app: FastAPI):
     try:
         Base.metadata.create_all(bind=engine)
     except Exception as e:
-        # Don't crash on startup if DB isn't reachable yet
         print(f"[startup] DB table creation skipped: {e}")
     yield
 

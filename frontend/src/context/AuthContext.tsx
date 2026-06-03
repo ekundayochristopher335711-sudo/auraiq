@@ -61,11 +61,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const register = async (email: string, fullName: string, password: string) => {
-    const { access_token } = await api.auth.register(email, fullName, password);
-    saveToken(access_token);
-    const me = await api.auth.me();
-    setUser(me);
-    router.push("/dashboard");
+    // Registration now requires OTP verification — handled directly in the register page
+    await api.auth.register(email, fullName, password);
+    router.push(`/verify-otp?email=${encodeURIComponent(email)}&purpose=verify_email`);
   };
 
   const logout = () => {

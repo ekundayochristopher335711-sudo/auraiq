@@ -1,0 +1,15 @@
+{
+  "name": "AuraIQ — Cognitive Mastery Engine",
+  "short_name": "AuraIQ",
+  "description": "AI-powered certification exam prep. Upload study material, get flashcards, track mastery.",
+  "start_url": "/dashboard",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#0a0a0a",
+  "theme_color": "#7c3aed",
+  "categories": ["education", "productivity"],
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "48x48", "type": "image/x-icon" }
+  ]
+}

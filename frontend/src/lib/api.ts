@@ -20,7 +20,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   auth: {
     register: (email: string, full_name: string, password: string) =>
-      request<{ access_token: string }>("/api/auth/register", {
+      request<{ email: string; message: string }>("/api/auth/register", {
         method: "POST",
         body: JSON.stringify({ email, full_name, password }),
       }),
@@ -30,6 +30,26 @@ export const api = {
         body: JSON.stringify({ email, password }),
       }),
     me: () => request<{ id: number; email: string; full_name: string; plan: string; study_streak: number }>("/api/auth/me"),
+    verifyOTP: (email: string, code: string, purpose: string) =>
+      request<{ access_token?: string; verified?: boolean; message?: string }>("/api/auth/verify-otp", {
+        method: "POST",
+        body: JSON.stringify({ email, code, purpose }),
+      }),
+    resendOTP: (email: string, purpose: string) =>
+      request<{ message: string }>("/api/auth/resend-otp", {
+        method: "POST",
+        body: JSON.stringify({ email, purpose }),
+      }),
+    forgotPassword: (email: string) =>
+      request<{ message: string }>("/api/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      }),
+    resetPassword: (email: string, code: string, new_password: string) =>
+      request<{ message: string }>("/api/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ email, code, new_password }),
+      }),
   },
   dashboard: {
     get: () => request<DashboardData>("/api/mastery/dashboard"),

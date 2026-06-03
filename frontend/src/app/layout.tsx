@@ -5,13 +5,29 @@ import { AuthProvider } from "@/context/AuthContext";
 export const metadata: Metadata = {
   title: "AuraIQ — Cognitive Mastery Engine",
   description: "Transform study materials into personalized learning systems. Predict exam readiness. Master any certification.",
+  manifest: "/manifest.json",
+  themeColor: "#7c3aed",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "AuraIQ",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      {/* Prevent FOUC: apply theme class before React hydrates */}
       <head>
+        <link rel="manifest" href="/manifest.json" />
+        <meta name="mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        {/* Apply theme before React hydrates — prevents flash */}
         <script dangerouslySetInnerHTML={{ __html: `
           (function(){
             try {
@@ -25,7 +41,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           })();
         `}} />
       </head>
-      <body className="bg-[#0a0a0a] text-white min-h-screen antialiased transition-colors duration-300">
+      <body className="min-h-screen antialiased transition-colors duration-300">
         <AuthProvider>
           {children}
         </AuthProvider>
