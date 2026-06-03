@@ -26,9 +26,8 @@ app = FastAPI(title="AuraIQ API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://auraiq.vercel.app", "http://localhost:3000"],
-    allow_origin_regex=r"https://auraiq.*\.vercel\.app",
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
