@@ -5,14 +5,14 @@ from typing import List, Optional
 class TopicScore(BaseModel):
     topic: str
     score: float
-    status: str  # "strong" | "moderate" | "weak"
+    status: str
 
 
 class ForgettingForecast(BaseModel):
     concept: str
     subject: str
     hours_until_forgotten: int
-    urgency: str  # "critical" | "high" | "medium"
+    urgency: str
 
 
 class DashboardStats(BaseModel):
@@ -21,7 +21,7 @@ class DashboardStats(BaseModel):
     mastery_percentage: float
     daily_review_queue: int
     cards_due_today: int
-    last_session_accuracy: Optional[float]
+    last_session_accuracy: Optional[float] = None
     plan: str
 
 

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from pydantic import BaseModel
-from typing import Optional
+from pydantic import BaseModel, Field
+from typing import Optional, Dict, Any
 from datetime import datetime, timedelta
 from app.core.database import get_db
 from app.api.routes.auth import get_current_user
@@ -16,22 +16,21 @@ class SessionCreate(BaseModel):
     duration_minutes: int
     cards_reviewed: int
     correct_answers: int
-    topic_scores: dict = {}
+    topic_scores: Dict[str, Any] = Field(default_factory=dict)
 
 
 def _update_streak(user: User) -> None:
-    """Increment streak for consecutive days; reset if a day was missed."""
     today = datetime.utcnow().date()
     if user.last_active is None:
         user.study_streak = 1
     else:
         last_date = user.last_active.date()
         if last_date == today:
-            pass  # already studied today — don't double-count
+            pass
         elif last_date == today - timedelta(days=1):
-            user.study_streak += 1  # consecutive day
+            user.study_streak += 1
         else:
-            user.study_streak = 1   # streak broken — restart
+            user.study_streak = 1
     user.last_active = datetime.utcnow()
 
 

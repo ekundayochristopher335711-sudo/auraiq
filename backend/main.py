@@ -15,8 +15,11 @@ from app.api.routes import auth, subjects, flashcards, sessions, mastery, ai, up
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Auto-create tables on startup (Alembic handles this in production)
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+    except Exception as e:
+        # Don't crash on startup if DB isn't reachable yet
+        print(f"[startup] DB table creation skipped: {e}")
     yield
 
 
@@ -30,13 +33,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(auth.router,       prefix="/api/auth",      tags=["auth"])
-app.include_router(subjects.router,   prefix="/api/subjects",  tags=["subjects"])
-app.include_router(flashcards.router, prefix="/api/flashcards",tags=["flashcards"])
-app.include_router(sessions.router,   prefix="/api/sessions",  tags=["sessions"])
-app.include_router(mastery.router,    prefix="/api/mastery",   tags=["mastery"])
-app.include_router(ai.router,         prefix="/api/ai",        tags=["ai"])
-app.include_router(upload.router,     prefix="/api/upload",    tags=["upload"])
+app.include_router(auth.router,       prefix="/api/auth",       tags=["auth"])
+app.include_router(subjects.router,   prefix="/api/subjects",   tags=["subjects"])
+app.include_router(flashcards.router, prefix="/api/flashcards", tags=["flashcards"])
+app.include_router(sessions.router,   prefix="/api/sessions",   tags=["sessions"])
+app.include_router(mastery.router,    prefix="/api/mastery",    tags=["mastery"])
+app.include_router(ai.router,         prefix="/api/ai",         tags=["ai"])
+app.include_router(upload.router,     prefix="/api/upload",     tags=["upload"])
 
 
 @app.get("/health")
