@@ -9,8 +9,23 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className="bg-[#0a0a0a] text-white min-h-screen antialiased">
+    <html lang="en" suppressHydrationWarning>
+      {/* Prevent FOUC: apply theme class before React hydrates */}
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function(){
+            try {
+              var s = localStorage.getItem('auraiq-theme');
+              var d = window.matchMedia('(prefers-color-scheme: dark)').matches;
+              if (s === 'dark' || (!s && d)) document.documentElement.classList.add('dark');
+              else document.documentElement.classList.remove('dark');
+            } catch(e) {
+              document.documentElement.classList.add('dark');
+            }
+          })();
+        `}} />
+      </head>
+      <body className="bg-[#0a0a0a] text-white min-h-screen antialiased transition-colors duration-300">
         <AuthProvider>
           {children}
         </AuthProvider>

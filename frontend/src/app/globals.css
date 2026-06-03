@@ -1,13 +1,92 @@
 @import "tailwindcss";
 
-/* Dark theme CSS variables */
-:root {
-  --bg: #0a0a0a;
-  --text: #ffffff;
-}
-
-/* Scrollbar */
+/* ── Scrollbar ───────────────────────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.2); }
+
+/* ── LIGHT MODE ──────────────────────────────────────────────────────────── */
+
+/* Gradient background (matches the reference design) */
+html:not(.dark) body {
+  background:
+    radial-gradient(ellipse at 0% 0%,   rgba(178,232,224,0.95) 0%,  transparent 55%),
+    radial-gradient(ellipse at 100% 5%,  rgba(212,221,245,0.85) 0%,  transparent 50%),
+    radial-gradient(ellipse at 60% 100%, rgba(232,216,240,0.9)  0%,  transparent 55%),
+    linear-gradient(135deg, #c8ede8 0%, #f0eaf8 55%, #dce8f8 100%);
+  background-attachment: fixed;
+}
+
+/* Sidebar glass */
+html:not(.dark) aside {
+  background: rgba(255,255,255,0.55) !important;
+  backdrop-filter: blur(28px) saturate(2);
+  -webkit-backdrop-filter: blur(28px) saturate(2);
+  border-color: rgba(255,255,255,0.75) !important;
+}
+
+/* Card glass — targets all our dark card backgrounds */
+html:not(.dark) .bg-\[#141414\] {
+  background: rgba(255,255,255,0.62) !important;
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border-color: rgba(255,255,255,0.82) !important;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.95);
+}
+
+html:not(.dark) .bg-\[#0d0d0d\] {
+  background: rgba(255,255,255,0.42) !important;
+  backdrop-filter: blur(24px) saturate(1.8);
+  -webkit-backdrop-filter: blur(24px) saturate(1.8);
+  border-color: rgba(255,255,255,0.75) !important;
+}
+
+html:not(.dark) .bg-\[#0a0a0a\] { background: transparent !important; }
+html:not(.dark) .bg-\[#111111\] {
+  background: rgba(255,255,255,0.62) !important;
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border-color: rgba(255,255,255,0.82) !important;
+}
+html:not(.dark) .bg-\[#1a1a1a\] {
+  background: rgba(255,255,255,0.5) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+html:not(.dark) .bg-\[#1f1f1f\] { background: rgba(255,255,255,0.6) !important; }
+
+/* Small utility overrides */
+html:not(.dark) .bg-white\/3  { background: rgba(255,255,255,0.55) !important; }
+html:not(.dark) .bg-white\/4  { background: rgba(255,255,255,0.6)  !important; }
+html:not(.dark) .bg-white\/5  { background: rgba(255,255,255,0.65) !important; }
+html:not(.dark) .bg-white\/8  { background: rgba(255,255,255,0.7)  !important; }
+
+/* Borders */
+html:not(.dark) .border-white\/8  { border-color: rgba(255,255,255,0.8) !important; }
+html:not(.dark) .border-white\/10 { border-color: rgba(255,255,255,0.85) !important; }
+html:not(.dark) .divide-white\/4  > * + * { border-color: rgba(200,220,230,0.4) !important; }
+html:not(.dark) .divide-white\/5  > * + * { border-color: rgba(200,220,230,0.4) !important; }
+
+/* Text */
+html:not(.dark) .text-white   { color: #111827 !important; }
+html:not(.dark) .text-gray-100 { color: #1f2937 !important; }
+html:not(.dark) .text-gray-200 { color: #1f2937 !important; }
+html:not(.dark) .text-gray-300 { color: #374151 !important; }
+html:not(.dark) .text-gray-400 { color: #4b5563 !important; }
+html:not(.dark) .text-gray-500 { color: #6b7280 !important; }
+html:not(.dark) .text-gray-600 { color: #9ca3af !important; }
+
+/* Inputs */
+html:not(.dark) input,
+html:not(.dark) textarea {
+  background: rgba(255,255,255,0.75) !important;
+  color: #111827 !important;
+  border-color: rgba(200,215,230,0.8) !important;
+}
+html:not(.dark) input::placeholder,
+html:not(.dark) textarea::placeholder { color: #9ca3af !important; }
+
+/* Scrollbar light mode */
+html:not(.dark) ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); }
+html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }

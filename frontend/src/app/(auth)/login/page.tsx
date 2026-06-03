@@ -26,7 +26,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full max-w-md px-4">
       {/* Logo */}
       <div className="flex items-center justify-center gap-2.5 mb-8">
         <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
@@ -58,7 +58,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@example.com"
               required
-              className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-violet-500/60 focus:bg-[#1f1f1f] transition-all"
+              className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-4 py-3 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-violet-500/60 transition-all"
             />
           </div>
 
@@ -76,7 +76,7 @@ export default function LoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
-                className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-violet-500/60 focus:bg-[#1f1f1f] transition-all"
+                className="w-full bg-[#1a1a1a] border border-white/8 rounded-xl px-4 py-3 pr-11 text-sm text-white placeholder:text-gray-600 focus:outline-none focus:border-violet-500/60 transition-all"
               />
               <button
                 type="button"
@@ -100,21 +100,6 @@ export default function LoginPage() {
             )}
           </button>
         </form>
-
-        {/* Divider */}
-        <div className="flex items-center gap-3 my-6">
-          <div className="flex-1 h-px bg-white/8" />
-          <span className="text-xs text-gray-600">or</span>
-          <div className="flex-1 h-px bg-white/8" />
-        </div>
-
-        {/* Demo login */}
-        <button
-          onClick={() => { setEmail("demo@auraiq.app"); setPassword("demo1234"); }}
-          className="w-full border border-white/8 hover:border-white/20 hover:bg-white/5 text-gray-400 hover:text-gray-200 rounded-xl py-3 text-sm font-medium transition-all"
-        >
-          Use demo account
-        </button>
       </div>
 
       <p className="text-center text-sm text-gray-600 mt-5">
