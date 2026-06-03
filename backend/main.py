@@ -24,9 +24,12 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AuraIQ API", version="1.0.0", lifespan=lifespan)
 
+_origins = [o.strip() for o in settings.FRONTEND_URL.split(",") if o.strip()]
+_origins += ["http://localhost:3000"]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.FRONTEND_URL, "http://localhost:3000"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
