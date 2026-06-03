@@ -3,16 +3,23 @@ const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("auraiq_token") : null;
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 30000);
-  const res = await fetch(`${BASE_URL}${path}`, {
-    ...options,
-    signal: controller.signal,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...options?.headers,
-    },
-  }).finally(() => clearTimeout(timeout));
+  const timeout = setTimeout(() => controller.abort(), 70000);
+  let res: Response;
+  try {
+    res = await fetch(`${BASE_URL}${path}`, {
+      ...options,
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...options?.headers,
+      },
+    });
+  } catch {
+    clearTimeout(timeout);
+    throw new Error("Server is waking up — please wait a moment and try again.");
+  }
+  clearTimeout(timeout);
   if (!res.ok) {
     const error = await res.json().catch(() => ({ detail: "Request failed" }));
     throw new Error(error.detail ?? "Request failed");
