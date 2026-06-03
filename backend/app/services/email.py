@@ -35,6 +35,13 @@ def send_otp_email(to_email: str, otp: str, purpose: str) -> bool:
         print(f"{'='*50}\n")
         return True
 
+    # Always log OTP so it's visible in Render logs as fallback
+    print(f"\n{'='*50}")
+    print(f"[AuraIQ OTP] To: {to_email}")
+    print(f"[AuraIQ OTP] Purpose: {purpose}")
+    print(f"[AuraIQ OTP] Code: {otp}")
+    print(f"{'='*50}\n")
+
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"] = subject
