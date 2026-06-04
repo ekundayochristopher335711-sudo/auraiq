@@ -43,9 +43,28 @@ export const api = {
         study_streak: profile.study_streak ?? 0,
       };
     },
-    // register/login handled by Supabase Auth in AuthContext
     register: async () => {},
     login: async () => {},
+    forgotPassword: async (email: string) => {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/reset-password`,
+      });
+      if (error) throw new Error(error.message);
+    },
+    resetPassword: async (_email: string, _code: string, newPassword: string) => {
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw new Error(error.message);
+    },
+    verifyOTP: async (email: string, code: string, purpose: string) => {
+      const type = purpose === "verify_email" ? "signup" : "recovery";
+      const { data, error } = await supabase.auth.verifyOtp({ email, token: code, type });
+      if (error) throw new Error(error.message);
+      return { access_token: data.session?.access_token, verified: true };
+    },
+    resendOTP: async (email: string, _purpose: string) => {
+      const { error } = await supabase.auth.resend({ type: "signup", email });
+      if (error) throw new Error(error.message);
+    },
   },
 
   dashboard: {
