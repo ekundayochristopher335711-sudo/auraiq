@@ -3,15 +3,9 @@ import { useState, useRef, useEffect } from "react";
 import { Brain, Send, ChevronDown, Sparkles, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
+import type { Subject } from "@/lib/api";
 
-const SUBJECTS = [
-  "Risk Management",
-  "Cost Control",
-  "Stakeholder Engagement",
-  "Quality Management",
-  "Agile Frameworks",
-  "Procurement",
-];
+const SUBJECTS: string[] = [];
 
 const SUGGESTIONS: Record<string, string[]> = {
   "Risk Management": [
@@ -94,13 +88,22 @@ function MessageBubble({ msg }: { msg: Message }) {
 }
 
 export default function AiTutorPage() {
-  const [subject, setSubject]           = useState("Risk Management");
+  const [subjects, setSubjects]         = useState<string[]>([]);
+  const [subject, setSubject]           = useState("");
   const [messages, setMessages]         = useState<Message[]>([]);
   const [input, setInput]               = useState("");
   const [loading, setLoading]           = useState(false);
   const [showSubjectMenu, setShowSubjectMenu] = useState(false);
   const messagesEndRef  = useRef<HTMLDivElement>(null);
   const inputRef        = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    api.subjects.list().then((s: Subject[]) => {
+      const titles = s.map((s) => s.title);
+      setSubjects(titles);
+      if (titles.length > 0 && !subject) setSubject(titles[0]);
+    }).catch(() => {});
+  }, []);
 
   const suggestions = SUGGESTIONS[subject] ?? [];
 
@@ -181,7 +184,9 @@ export default function AiTutorPage() {
           </button>
           {showSubjectMenu && (
             <div className="absolute right-0 top-full mt-1 w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden">
-              {SUBJECTS.map((s) => (
+              {subjects.length === 0 ? (
+                <p className="text-xs text-gray-500 px-4 py-3">No subjects yet — create one first</p>
+              ) : subjects.map((s) => (
                 <button
                   key={s}
                   onClick={() => { setSubject(s); setShowSubjectMenu(false); }}

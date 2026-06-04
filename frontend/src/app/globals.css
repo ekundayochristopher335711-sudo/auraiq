@@ -13,7 +13,6 @@ body {
 
 /* ── LIGHT MODE ──────────────────────────────────────────────────────────── */
 
-/* Gradient background */
 html:not(.dark) body {
   background-color: transparent;
   background-image:
@@ -25,7 +24,6 @@ html:not(.dark) body {
   min-height: 100vh;
 }
 
-/* Sidebar glass */
 html:not(.dark) aside {
   background: rgba(255,255,255,0.52) !important;
   backdrop-filter: blur(28px) saturate(2);
@@ -33,9 +31,9 @@ html:not(.dark) aside {
   border-color: rgba(255,255,255,0.75) !important;
 }
 
-/* Card backgrounds → glass */
-html:not(.dark) .bg-\[#141414\],
-html:not(.dark) .bg-\[#111111\] {
+/* Card backgrounds — use attribute selector to avoid escaped bracket issues */
+html:not(.dark) [class*="bg-[#14"],
+html:not(.dark) [class*="bg-[#11"] {
   background: rgba(255,255,255,0.62) !important;
   backdrop-filter: blur(20px) saturate(1.8);
   -webkit-backdrop-filter: blur(20px) saturate(1.8);
@@ -43,30 +41,30 @@ html:not(.dark) .bg-\[#111111\] {
   box-shadow: 0 8px 32px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.95);
 }
 
-html:not(.dark) .bg-\[#0d0d0d\] {
+html:not(.dark) [class*="bg-[#0d"] {
   background: rgba(255,255,255,0.42) !important;
   backdrop-filter: blur(24px) saturate(1.8);
   -webkit-backdrop-filter: blur(24px) saturate(1.8);
   border-color: rgba(255,255,255,0.75) !important;
 }
 
-html:not(.dark) .bg-\[#1a1a1a\] {
+html:not(.dark) [class*="bg-[#1a"] {
   background: rgba(255,255,255,0.55) !important;
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
 
-html:not(.dark) .bg-\[#1f1f1f\] { background: rgba(255,255,255,0.65) !important; }
-html:not(.dark) .bg-white\/3    { background: rgba(255,255,255,0.5)  !important; }
-html:not(.dark) .bg-white\/4    { background: rgba(255,255,255,0.55) !important; }
-html:not(.dark) .bg-white\/5    { background: rgba(255,255,255,0.6)  !important; }
-html:not(.dark) .bg-white\/8    { background: rgba(255,255,255,0.65) !important; }
+html:not(.dark) [class*="bg-[#1f"] { background: rgba(255,255,255,0.65) !important; }
+html:not(.dark) [class*="bg-[#0a"] { background: transparent !important; }
 
-/* Borders */
+html:not(.dark) .bg-white\/3  { background: rgba(255,255,255,0.5)  !important; }
+html:not(.dark) .bg-white\/4  { background: rgba(255,255,255,0.55) !important; }
+html:not(.dark) .bg-white\/5  { background: rgba(255,255,255,0.6)  !important; }
+html:not(.dark) .bg-white\/8  { background: rgba(255,255,255,0.65) !important; }
+
 html:not(.dark) .border-white\/8  { border-color: rgba(200,220,240,0.6) !important; }
 html:not(.dark) .border-white\/10 { border-color: rgba(200,220,240,0.7) !important; }
 
-/* Text */
 html:not(.dark) .text-white    { color: #111827 !important; }
 html:not(.dark) .text-gray-100 { color: #1f2937 !important; }
 html:not(.dark) .text-gray-200 { color: #1f2937 !important; }
@@ -75,7 +73,6 @@ html:not(.dark) .text-gray-400 { color: #4b5563 !important; }
 html:not(.dark) .text-gray-500 { color: #6b7280 !important; }
 html:not(.dark) .text-gray-600 { color: #9ca3af !important; }
 
-/* Inputs */
 html:not(.dark) input,
 html:not(.dark) textarea {
   background: rgba(255,255,255,0.75) !important;
@@ -85,9 +82,5 @@ html:not(.dark) textarea {
 html:not(.dark) input::placeholder,
 html:not(.dark) textarea::placeholder { color: #9ca3af !important; }
 
-/* Auth layout in light mode */
-html:not(.dark) .bg-\[#0a0a0a\] { background: transparent !important; }
-
-/* Scrollbar light */
 html:not(.dark) ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); }
 html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }

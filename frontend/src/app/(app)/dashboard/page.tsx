@@ -54,8 +54,8 @@ const MOCK_SUBJECTS: Subject[] = [
 ];
 
 export default function DashboardPage() {
-  const [data, setData]           = useState<DashboardData>(MOCK_DASHBOARD);
-  const [subjects, setSubjects]   = useState<Subject[]>(MOCK_SUBJECTS);
+  const [data, setData]           = useState<DashboardData | null>(null);
+  const [subjects, setSubjects]   = useState<Subject[]>([]);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [realSubjects, setRealSubjects]     = useState<Subject[] | null>(null);
 
@@ -78,7 +78,7 @@ export default function DashboardPage() {
     setShowOnboarding(false);
   };
 
-  const { stats, topic_scores, forgetting_forecasts, performance_trend } = data;
+  const { stats, topic_scores, forgetting_forecasts, performance_trend } = data ?? MOCK_DASHBOARD;
 
   const isNewUser = realSubjects !== null && realSubjects.length === 0;
 
