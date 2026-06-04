@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const token = typeof window !== "undefined" ? localStorage.getItem("auraiq_token") : null;
@@ -15,9 +15,15 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
         ...options?.headers,
       },
     });
-  } catch {
+  } catch (error: any) {
     clearTimeout(timeout);
-    throw new Error("Server is waking up — please wait a moment and try again.");
+    if (controller.signal.aborted) {
+      throw new Error("Request timed out after 70 seconds. The backend may still be waking up.");
+    }
+    if (error?.name === "TypeError") {
+      throw new Error("Unable to reach the backend. Please check your network or wait a moment and try again.");
+    }
+    throw new Error(error?.message ?? "Unable to reach the backend.");
   }
   clearTimeout(timeout);
   if (!res.ok) {

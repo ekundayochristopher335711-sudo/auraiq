@@ -42,7 +42,7 @@ function MessageBubble({ msg }: { msg: Message }) {
           : "bg-[#1a1a1a] text-gray-200 rounded-tl-sm border border-white/8"
       )}>
         {msg.imageUrl && (
-          <img src={msg.imageUrl} alt="uploaded" className="rounded-xl max-w-[240px] mb-2 block" />
+          <img src={msg.imageUrl} alt="uploaded" className="rounded-xl max-w-60 mb-2 block" />
         )}
         {msg.content}
       </div>
@@ -59,6 +59,9 @@ export default function AiTutorPage() {
   const [showSubjectMenu, setShowSubjectMenu] = useState(false);
   const [imagePreview, setImagePreview]       = useState<string | null>(null);
   const [imageBase64, setImageBase64]         = useState<string>("");
+  const [backendError, setBackendError]       = useState<string | null>(null);
+  const [lastFailedUserMessage, setLastFailedUserMessage] = useState("");
+  const [lastFailedImage, setLastFailedImage] = useState<string | null>(null);
   const messagesEndRef  = useRef<HTMLDivElement>(null);
   const inputRef        = useRef<HTMLTextAreaElement>(null);
   const fileInputRef    = useRef<HTMLInputElement>(null);
@@ -125,40 +128,56 @@ export default function AiTutorPage() {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const send = async (text: string) => {
+  const sendMessage = async (text: string, imageData?: string) => {
     const msg = text.trim();
-    if ((!msg && !imageBase64) || loading) return;
+    if ((!msg && !imageData) || loading) return;
 
     const userMsg: Message = {
       id: `u-${Date.now()}`,
       role: "user",
       content: msg,
-      imageUrl: imagePreview ?? undefined,
+      imageUrl: imageData ? imageData : imagePreview ?? undefined,
     };
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
-    const imgB64 = imageBase64;
+    setLastFailedUserMessage(msg);
+    setLastFailedImage(imageData ?? imageBase64 ?? null);
+    setBackendError(null);
+    const imgB64 = imageData ?? imageBase64;
     clearImage();
     setLoading(true);
 
     try {
       const res = await api.ai.chat(msg, subject, history, imgB64 || undefined);
+      setBackendError(null);
       setMessages((prev) => [...prev, {
         id: `a-${Date.now()}`,
         role: "assistant",
         content: res.reply,
       }]);
     } catch (err: any) {
+      const errorMessage = err?.message ?? "Unknown error";
+      const isWakeUpError = /waking up|backend|timed out/i.test(errorMessage);
+      if (isWakeUpError) {
+        setBackendError(errorMessage);
+      }
       setMessages((prev) => [...prev, {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: `⚠️ AI request failed: ${err?.message ?? "Unknown error"}. Please try again.`,
+        content: `⚠️ AI request failed: ${errorMessage}. Please try again.`,
       }]);
     } finally {
       setLoading(false);
     }
+  };
+
+  const send = (text: string) => sendMessage(text);
+
+  const retryAIRequest = async () => {
+    if (!lastFailedUserMessage && !lastFailedImage) return;
+    await sendMessage(lastFailedUserMessage, lastFailedImage ?? undefined);
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -216,6 +235,25 @@ export default function AiTutorPage() {
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-5">
         <div className="max-w-2xl mx-auto space-y-4">
+          {backendError && (
+            <div className="rounded-2xl border border-amber-400/20 bg-amber-500/10 p-4 text-amber-100 shadow-sm">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div>
+                  <p className="text-sm font-semibold">AI backend is waking up</p>
+                  <p className="mt-1 text-sm text-amber-100/90">
+                    {backendError} Please wait a moment, then retry your last request.
+                  </p>
+                </div>
+                <button
+                  onClick={retryAIRequest}
+                  className="inline-flex items-center justify-center rounded-xl bg-amber-500 px-3 py-2 text-xs font-semibold text-slate-950 hover:bg-amber-400 transition"
+                >
+                  Retry
+                </button>
+              </div>
+            </div>
+          )}
+
           {messages.map((msg) => <MessageBubble key={msg.id} msg={msg} />)}
 
           {loading && (
