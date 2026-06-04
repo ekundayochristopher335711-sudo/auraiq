@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     GROQ_API_KEY:              str = ""
     FRONTEND_URL:              str = "http://localhost:3000"
 
+    # Supabase
+    SUPABASE_JWT_SECRET: str = ""
+
     # Resend API — get free key at resend.com (works on Render free tier)
     RESEND_API_KEY: str = ""
     SMTP_FROM: str = "onboarding@resend.dev"

@@ -10,12 +10,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
-            <Brain size={20} className="text-white" />
-          </div>
-          <div className="w-5 h-5 border-2 border-violet-600 border-t-transparent rounded-full animate-spin" />
+      <div className="min-h-screen flex flex-col items-center justify-center gap-5">
+        <div className="w-12 h-12 rounded-2xl bg-violet-600 flex items-center justify-center shadow-lg shadow-violet-500/30">
+          <Brain size={22} className="text-white" />
+        </div>
+        <div className="flex gap-1.5">
+          {[0,1,2].map((i) => (
+            <div key={i} className="w-2 h-2 rounded-full bg-violet-500 animate-bounce"
+              style={{ animationDelay: `${i * 0.15}s` }} />
+          ))}
         </div>
       </div>
     );

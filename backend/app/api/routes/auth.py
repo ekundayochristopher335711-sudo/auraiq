@@ -6,7 +6,9 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
+from jose import JWTError, jwt
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.core.security import hash_password, verify_password, create_access_token, decode_token
 from app.models.user import User
@@ -20,15 +22,48 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 
+def _decode_supabase_token(token: str) -> Optional[dict]:
+    if not settings.SUPABASE_JWT_SECRET:
+        return None
+    try:
+        return jwt.decode(token, settings.SUPABASE_JWT_SECRET, algorithms=["HS256"])
+    except JWTError:
+        return None
+
+
 def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+    payload = None
     try:
         payload = decode_token(token)
         user_id: int = int(payload.get("sub"))
+        user = db.query(User).filter(User.id == user_id).first()
+        if user:
+            return user
     except Exception:
+        pass
+
+    payload = _decode_supabase_token(token)
+    if not payload:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
-    user = db.query(User).filter(User.id == user_id).first()
+
+    email = payload.get("email")
+    if not email:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token")
+
+    user = db.query(User).filter(User.email == email).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+        metadata = payload.get("user_metadata") or {}
+        full_name = metadata.get("full_name") or email.split("@")[0]
+        user = User(
+            email=email,
+            full_name=full_name,
+            hashed_password="",
+            email_verified=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
     return user
 
 
