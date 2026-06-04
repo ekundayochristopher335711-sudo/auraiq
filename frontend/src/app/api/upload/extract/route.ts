@@ -1,12 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
-// @ts-ignore
-import pdfParse from "pdf-parse/lib/pdf-parse.js";
-// @ts-ignore
+import pdfParse from "pdf-parse";
 import mammoth from "mammoth";
 
-export const config = { api: { bodyParser: false } };
+export const runtime = "nodejs";
 
 async function getUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
