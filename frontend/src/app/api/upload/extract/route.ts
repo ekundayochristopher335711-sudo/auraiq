@@ -5,6 +5,20 @@ import OpenAI from "openai";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
+// Polyfill browser APIs missing in Node.js serverless environment
+if (typeof (global as any).DOMMatrix === "undefined") {
+  (global as any).DOMMatrix = class DOMMatrix {
+    constructor() { return this; }
+    static fromMatrix() { return new (this as any)(); }
+  };
+}
+if (typeof (global as any).Path2D === "undefined") {
+  (global as any).Path2D = class Path2D {};
+}
+if (typeof (global as any).ImageData === "undefined") {
+  (global as any).ImageData = class ImageData {};
+}
+
 async function getUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return null;
