@@ -134,9 +134,21 @@ export default function AiTutorPage() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const result = reader.result as string;
-      setImagePreview(result);
-      setImageBase64(result); // send full data URL including mime type prefix
+      const original = reader.result as string;
+      // Compress image using canvas before sending
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 800;
+        const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width  = Math.round(img.width  * scale);
+        canvas.height = Math.round(img.height * scale);
+        canvas.getContext("2d")?.drawImage(img, 0, 0, canvas.width, canvas.height);
+        const compressed = canvas.toDataURL("image/jpeg", 0.7);
+        setImagePreview(compressed);
+        setImageBase64(compressed);
+      };
+      img.src = original;
     };
     reader.readAsDataURL(file);
   };
