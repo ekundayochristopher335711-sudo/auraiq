@@ -5,20 +5,6 @@ import OpenAI from "openai";
 export const runtime = "nodejs";
 export const maxDuration = 60;
 
-// Polyfill browser APIs missing in Node.js serverless environment
-if (typeof (global as any).DOMMatrix === "undefined") {
-  (global as any).DOMMatrix = class DOMMatrix {
-    constructor() { return this; }
-    static fromMatrix() { return new (this as any)(); }
-  };
-}
-if (typeof (global as any).Path2D === "undefined") {
-  (global as any).Path2D = class Path2D {};
-}
-if (typeof (global as any).ImageData === "undefined") {
-  (global as any).ImageData = class ImageData {};
-}
-
 async function getUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
   if (!token) return null;
@@ -38,6 +24,28 @@ function getAIClient() {
   return { client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), model: "gpt-4o-mini" };
 }
 
+function parsePDF(buffer: Buffer): Promise<string> {
+  return new Promise((resolve, reject) => {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const PDFParser = require("pdf2json");
+    const parser = new PDFParser();
+    parser.on("pdfParser_dataError", (err: any) => reject(new Error(err.parserError ?? "PDF parse error")));
+    parser.on("pdfParser_dataReady", (data: any) => {
+      try {
+        const text = data.Pages?.map((page: any) =>
+          page.Texts?.map((t: any) =>
+            t.R?.map((r: any) => decodeURIComponent(r.T ?? "")).join("") ?? ""
+          ).join(" ") ?? ""
+        ).join("\n") ?? "";
+        resolve(text);
+      } catch {
+        reject(new Error("Failed to extract text from PDF"));
+      }
+    });
+    parser.parseBuffer(buffer);
+  });
+}
+
 async function extractText(file: File): Promise<string> {
   const buffer = Buffer.from(await file.arrayBuffer());
   const name = file.name.toLowerCase();
@@ -47,10 +55,7 @@ async function extractText(file: File): Promise<string> {
   }
 
   if (name.endsWith(".pdf")) {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const pdfParse = require("pdf-parse");
-    const result = await pdfParse(buffer);
-    return result.text as string;
+    return await parsePDF(buffer);
   }
 
   if (name.endsWith(".docx")) {
