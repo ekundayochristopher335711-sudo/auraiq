@@ -1,11 +1,43 @@
 "use client";
-import { useRef, useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Brain, Loader2, RotateCcw } from "lucide-react";
-import { api } from "@/lib/api";
-import { useAuth } from "@/context/AuthContext";
+import { Brain } from "lucide-react";
 
-function OTPInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+export default function VerifyOTPPage() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const email = params.get("email") ?? "";
+
+  return (
+    <div className="w-full max-w-md px-4">
+      <div className="flex items-center justify-center gap-2.5 mb-8">
+        <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
+          <Brain size={18} className="text-white" />
+        </div>
+        <span className="text-white font-bold text-xl tracking-tight">AuraIQ</span>
+      </div>
+
+      <div className="bg-[#111111] border border-white/8 rounded-2xl p-8 text-center">
+        <div className="mb-6">
+          <h1 className="text-xl font-bold text-white mb-2">Confirm your email</h1>
+          <p className="text-sm text-gray-400">
+            We sent a confirmation link to <span className="text-white font-medium">{email || "your email address"}</span>.
+          </p>
+        </div>
+
+        <p className="text-sm text-gray-500 leading-relaxed">
+          Open the email and click the confirmation link. Then return to AuraIQ and sign in to continue.
+        </p>
+
+        <button
+          onClick={() => router.push("/login")}
+          className="mt-8 w-full rounded-xl bg-violet-600 hover:bg-violet-500 px-4 py-3 text-sm font-semibold text-white transition-colors"
+        >
+          Back to login
+        </button>
+      </div>
+    </div>
+  );
+}
   const refs = useRef<(HTMLInputElement | null)[]>([]);
 
   const handle = (i: number, char: string) => {

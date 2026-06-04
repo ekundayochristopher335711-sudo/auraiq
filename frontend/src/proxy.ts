@@ -9,7 +9,11 @@ export function proxy(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Skip auth in development so the UI can be previewed without a backend
+  // This middleware only protects page routes and redirects unauthenticated
+  // users. It is not an API reverse proxy for the backend.
+  //
+  // API requests are handled by the client-side API wrapper in src/lib/api.ts
+  // and require NEXT_PUBLIC_API_URL to point to the backend when deployed.
   if (process.env.NODE_ENV === "development") return NextResponse.next();
 
   // Token lives in localStorage (client-only), so we use a cookie set by the

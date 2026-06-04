@@ -12,58 +12,21 @@ import { TopAssetsCard } from "@/components/dashboard/TopAssetsCard";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { api, DashboardData, Subject } from "@/lib/api";
 
-const MOCK_DASHBOARD: DashboardData = {
-  stats: {
-    exam_readiness: 72,
-    study_streak: 14,
-    mastery_percentage: 61,
-    daily_review_queue: 23,
-    cards_due_today: 23,
-    last_session_accuracy: 0.84,
-    plan: "free",
-  },
-  topic_scores: [
-    { topic: "Risk Management", score: 88, status: "strong" },
-    { topic: "Stakeholder Engagement", score: 55, status: "moderate" },
-    { topic: "Agile Frameworks", score: 71, status: "moderate" },
-    { topic: "Cost Control", score: 32, status: "weak" },
-    { topic: "Procurement", score: 18, status: "weak" },
-    { topic: "Quality Management", score: 90, status: "strong" },
-  ],
-  forgetting_forecasts: [
-    { concept: "Monte Carlo Analysis", subject: "Risk Management", hours_until_forgotten: 8, urgency: "critical" },
-    { concept: "Stakeholder Register", subject: "Stakeholder Engagement", hours_until_forgotten: 24, urgency: "high" },
-    { concept: "Earned Value Management", subject: "Cost Control", hours_until_forgotten: 48, urgency: "medium" },
-  ],
-  performance_trend: [
-    { date: "Mon", score: 58 },
-    { date: "Tue", score: 63 },
-    { date: "Wed", score: 60 },
-    { date: "Thu", score: 71 },
-    { date: "Fri", score: 68 },
-    { date: "Sat", score: 79 },
-    { date: "Sun", score: 84 },
-  ],
-};
-
-const MOCK_SUBJECTS: Subject[] = [
-  { id: 1, title: "Risk Management", description: null, mastery_score: 0.88 },
-  { id: 2, title: "Stakeholder Engagement", description: null, mastery_score: 0.55 },
-  { id: 3, title: "Agile Frameworks", description: null, mastery_score: 0.71 },
-  { id: 4, title: "Cost Control", description: null, mastery_score: 0.32 },
-];
 
 export default function DashboardPage() {
   const [data, setData]           = useState<DashboardData | null>(null);
   const [subjects, setSubjects]   = useState<Subject[]>([]);
+  const [loading, setLoading]     = useState(true);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [realSubjects, setRealSubjects]     = useState<Subject[] | null>(null);
 
   useEffect(() => {
-    api.dashboard.get().then(setData).catch(() => {});
-    api.subjects.list()
-      .then((s) => { setSubjects(s); setRealSubjects(s); })
-      .catch(() => { setRealSubjects([]); });
+    Promise.all([
+      api.dashboard.get().then(setData).catch(() => {}),
+      api.subjects.list()
+        .then((s) => { setSubjects(s); setRealSubjects(s); })
+        .catch(() => { setRealSubjects([]); }),
+    ]).finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -78,9 +41,20 @@ export default function DashboardPage() {
     setShowOnboarding(false);
   };
 
-  const { stats, topic_scores, forgetting_forecasts, performance_trend } = data ?? MOCK_DASHBOARD;
+  const { stats, topic_scores, forgetting_forecasts, performance_trend } = data ?? {
+    stats: { exam_readiness: 0, study_streak: 0, mastery_percentage: 0, daily_review_queue: 0, cards_due_today: 0, last_session_accuracy: null, plan: "free" },
+    topic_scores: [], forgetting_forecasts: [], performance_trend: [],
+  };
 
   const isNewUser = realSubjects !== null && realSubjects.length === 0;
+
+  if (loading) {
+    return (
+      <div className="p-6 flex items-center justify-center min-h-[60vh]">
+        <div className="w-6 h-6 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 space-y-6 min-h-full">

@@ -3,7 +3,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Brain, Eye, EyeOff, Loader2, AlertCircle, Check } from "lucide-react";
-import { api } from "@/lib/api";
+import { supabase } from "@/lib/supabaseClient";
 
 const PASSWORD_RULES = [
   { label: "At least 8 characters",  test: (p: string) => p.length >= 8 },
@@ -30,8 +30,17 @@ export default function RegisterPage() {
     if (strength < 2) { setError("Please choose a stronger password."); return; }
     setLoading(true);
     try {
-      const res = await api.auth.register(email, fullName, password);
-      router.push(`/verify-otp?email=${encodeURIComponent(res.email)}&purpose=verify_email`);
+      const { data, error } = await supabase.auth.signUp(
+        { email, password },
+        { data: { full_name: fullName } }
+      );
+      if (error) throw error;
+
+      if (data?.session?.access_token) {
+        router.push("/dashboard");
+      } else {
+        router.push("/login?registered=1");
+      }
     } catch (err: any) {
       setError(err.message ?? "Registration failed. Please try again.");
     } finally {

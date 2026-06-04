@@ -1,6 +1,7 @@
 "use client";
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabaseClient";
 import { api } from "@/lib/api";
 
 interface User {
@@ -16,7 +17,7 @@ interface AuthContextValue {
   loading: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, fullName: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -28,7 +29,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const saveToken = (token: string) => {
     localStorage.setItem("auraiq_token", token);
-    // Write a cookie so Next.js middleware can check auth server-side
     document.cookie = `auraiq_token=${token}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Lax`;
   };
 
@@ -38,41 +38,76 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const fetchMe = useCallback(async () => {
-    const token = localStorage.getItem("auraiq_token");
-    if (!token) { setLoading(false); return; }
+    setLoading(true);
+    const { data, error } = await supabase.auth.getSession();
+    if (error || !data?.session?.access_token) {
+      clearToken();
+      setLoading(false);
+      return;
+    }
+
+    saveToken(data.session.access_token);
+
     try {
       const me = await api.auth.me();
       setUser(me);
     } catch {
       clearToken();
+      setUser(null);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => { fetchMe(); }, [fetchMe]);
+  useEffect(() => {
+    fetchMe();
+
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session?.access_token) {
+        clearToken();
+        setUser(null);
+        return;
+      }
+      saveToken(session.access_token);
+    });
+
+    return () => authListener.subscription.unsubscribe();
+  }, [fetchMe]);
 
   const login = async (email: string, password: string) => {
-    const { access_token } = await api.auth.login(email, password);
-    saveToken(access_token);
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error || !data?.session?.access_token) {
+      throw new Error(error?.message ?? "Login failed. Please try again.");
+    }
+
+    saveToken(data.session.access_token);
     const me = await api.auth.me();
     setUser(me);
     router.push("/dashboard");
   };
 
   const register = async (email: string, fullName: string, password: string) => {
-    const res = await api.auth.register(email, fullName, password);
-    if (res.access_token) {
-      saveToken(res.access_token);
+    const { data, error } = await supabase.auth.signUp(
+      { email, password },
+      { data: { full_name: fullName } }
+    );
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    if (data?.session?.access_token) {
+      saveToken(data.session.access_token);
       const me = await api.auth.me();
       setUser(me);
       router.push("/dashboard");
-    } else {
-      router.push(`/verify-otp?email=${encodeURIComponent(email)}&purpose=verify_email`);
+      return;
     }
+
+    router.push("/login?registered=1");
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     clearToken();
     setUser(null);
     router.push("/login");
