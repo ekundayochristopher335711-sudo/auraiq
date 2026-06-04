@@ -108,7 +108,16 @@ html:not(.dark) textarea::placeholder { color: #9ca3af !important; }
 html:not(.dark) ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); }
 html:not(.dark) ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
 
-/* Light mode nav active state */
-html:not(.dark) .bg-violet-600\/20 { background: rgba(124,58,237,0.15) !important; }
-html:not(.dark) nav a { color: #374151; }
-html:not(.dark) nav a:hover { color: #111827; background: rgba(0,0,0,0.05) !important; }
+/* Light mode sidebar */
+html:not(.dark) aside#sidebar {
+  background: rgba(255,255,255,0.85) !important;
+  backdrop-filter: blur(28px) saturate(2) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(2) !important;
+  border-color: rgba(200,220,240,0.6) !important;
+}
+html:not(.dark) aside#sidebar .text-white { color: #111827 !important; }
+html:not(.dark) aside#sidebar .text-gray-500 { color: #6b7280 !important; }
+html:not(.dark) aside#sidebar .text-gray-200 { color: #1f2937 !important; }
+html:not(.dark) aside#sidebar .hover\:bg-white\/5:hover { background: rgba(0,0,0,0.06) !important; }
+html:not(.dark) aside#sidebar .bg-violet-600\/20 { background: rgba(124,58,237,0.12) !important; }
+html:not(.dark) aside#sidebar .text-violet-400 { color: #7c3aed !important; }

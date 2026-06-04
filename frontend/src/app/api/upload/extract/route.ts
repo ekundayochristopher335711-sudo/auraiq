@@ -6,6 +6,7 @@ const pdfParse = require("pdf-parse") as (buf: Buffer) => Promise<{ text: string
 import mammoth from "mammoth";
 
 export const runtime = "nodejs";
+export const maxDuration = 60;
 
 async function getUser(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");

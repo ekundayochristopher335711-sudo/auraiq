@@ -77,10 +77,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       <aside
         id="sidebar"
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex flex-col w-56 border-r border-white/8 py-5 px-3 shrink-0 transition-transform duration-300",
-          "bg-[#0d0d0d]",
+          "fixed inset-y-0 left-0 z-50 flex flex-col w-64 border-r border-white/8 py-5 px-3 shrink-0 transition-transform duration-300",
+          "bg-[#0d0d0d] dark:bg-[#0d0d0d]",
           "lg:relative lg:translate-x-0",
-          isOpen ? "translate-x-0" : "-translate-x-full"
+          isOpen ? "translate-x-0 shadow-2xl" : "-translate-x-full"
         )}
       >
         {/* Logo + close on mobile */}

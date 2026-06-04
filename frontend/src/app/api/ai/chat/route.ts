@@ -21,6 +21,8 @@ async function getUser(req: NextRequest) {
   return user;
 }
 
+export const maxDuration = 60;
+
 export async function POST(req: NextRequest) {
   const user = await getUser(req);
   if (!user) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
