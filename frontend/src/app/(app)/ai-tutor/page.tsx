@@ -137,11 +137,11 @@ export default function AiTutorPage() {
         role: "assistant",
         content: res.reply,
       }]);
-    } catch {
+    } catch (err: any) {
       setMessages((prev) => [...prev, {
         id: `a-${Date.now()}`,
         role: "assistant",
-        content: "⚠️ The AI backend isn't connected. Start the FastAPI server (see the `backend/` folder) to enable live tutoring.\n\nIn the meantime, use Flashcards and the Exam Simulator to study offline!",
+        content: `⚠️ AI request failed: ${err?.message ?? "Unknown error"}. Please try again.`,
       }]);
     } finally {
       setLoading(false);
