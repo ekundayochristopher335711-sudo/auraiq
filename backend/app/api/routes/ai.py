@@ -47,9 +47,11 @@ async def socratic_chat(body: ChatRequest, current_user: User = Depends(get_curr
 
     if body.image_base64:
         model = "llama-3.2-11b-vision-preview" if settings.GROQ_API_KEY else _get_model()
+        # image_base64 is the full data URL: "data:image/png;base64,..."
+        image_url = body.image_base64 if body.image_base64.startswith("data:") else f"data:image/jpeg;base64,{body.image_base64}"
         user_content = [
-            {"type": "text", "text": body.message or "What does this image show? Explain it in the context of studying."},
-            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{body.image_base64}"}},
+            {"type": "text", "text": body.message or "Describe what you see in this image in detail."},
+            {"type": "image_url", "image_url": {"url": image_url}},
         ]
         messages.append({"role": "user", "content": user_content})
     else:

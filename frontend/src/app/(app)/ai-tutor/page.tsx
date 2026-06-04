@@ -136,7 +136,7 @@ export default function AiTutorPage() {
     reader.onload = () => {
       const result = reader.result as string;
       setImagePreview(result);
-      setImageBase64(result.split(",")[1]);
+      setImageBase64(result); // send full data URL including mime type prefix
     };
     reader.readAsDataURL(file);
   };
