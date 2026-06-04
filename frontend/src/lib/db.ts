@@ -115,7 +115,7 @@ export async function createSession(session: {
   if (error) throw error;
 
   // Update study streak on profile
-  await supabase.rpc("increment_streak", { uid: user.id }).catch(() => {});
+  try { await supabase.rpc("increment_streak", { uid: user.id }); } catch { }
 
   return { id: data.id, accuracy };
 }
