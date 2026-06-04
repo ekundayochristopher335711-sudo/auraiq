@@ -80,15 +80,14 @@ def register(body: RegisterRequest, db: Session = Depends(get_db)):
         email=body.email,
         full_name=body.full_name,
         hashed_password=hash_password(body.password),
-        email_verified=False,
+        email_verified=True,
     )
     db.add(user)
     db.commit()
+    db.refresh(user)
 
-    code = _create_otp(db, body.email, "verify_email")
-    send_otp_email(body.email, code, "verify_email")
-
-    return {"message": "Verification code sent to your email", "email": body.email}
+    token = create_access_token({"sub": str(user.id)})
+    return {"access_token": token, "token_type": "bearer", "email": body.email}
 
 
 @router.post("/login", response_model=TokenResponse)
