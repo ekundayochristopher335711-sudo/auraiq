@@ -1,7 +1,4 @@
-import smtplib
-import ssl
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
+import httpx
 from app.core.config import settings
 
 
@@ -26,34 +23,33 @@ def _html(otp: str, purpose: str) -> str:
 def send_otp_email(to_email: str, otp: str, purpose: str) -> bool:
     subject = "Verify your AuraIQ account" if purpose == "verify_email" else "Reset your AuraIQ password"
 
-    # No SMTP configured — print to console (visible in Render logs)
-    if not settings.SMTP_HOST:
-        print(f"\n{'='*50}")
-        print(f"[AuraIQ OTP] To: {to_email}")
-        print(f"[AuraIQ OTP] Purpose: {purpose}")
-        print(f"[AuraIQ OTP] Code: {otp}")
-        print(f"{'='*50}\n")
-        return True
-
-    # Always log OTP so it's visible in Render logs as fallback
+    # Always log OTP to Render logs as fallback
     print(f"\n{'='*50}")
     print(f"[AuraIQ OTP] To: {to_email}")
     print(f"[AuraIQ OTP] Purpose: {purpose}")
     print(f"[AuraIQ OTP] Code: {otp}")
     print(f"{'='*50}\n")
 
-    try:
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = subject
-        msg["From"]    = f"AuraIQ <{settings.SMTP_FROM}>"
-        msg["To"]      = to_email
-        msg.attach(MIMEText(_html(otp, purpose), "html"))
-
-        ctx = ssl.create_default_context()
-        with smtplib.SMTP_SSL(settings.SMTP_HOST, int(settings.SMTP_PORT), context=ctx) as s:
-            s.login(settings.SMTP_USER, settings.SMTP_PASS)
-            s.sendmail(settings.SMTP_FROM, to_email, msg.as_string())
+    if not settings.RESEND_API_KEY:
         return True
+
+    try:
+        res = httpx.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {settings.RESEND_API_KEY}"},
+            json={
+                "from": f"AuraIQ <{settings.SMTP_FROM}>",
+                "to": [to_email],
+                "subject": subject,
+                "html": _html(otp, purpose),
+            },
+            timeout=10,
+        )
+        if res.status_code == 200 or res.status_code == 201:
+            print(f"[Email] Sent successfully via Resend")
+            return True
+        print(f"[Email] Resend error {res.status_code}: {res.text}")
+        return False
     except Exception as e:
         print(f"[Email] Send failed: {e}")
         return False

@@ -9,12 +9,9 @@ class Settings(BaseSettings):
     OPENAI_API_KEY:            str = ""
     FRONTEND_URL:              str = "http://localhost:3000"
 
-    # SMTP email — leave blank to log OTP to console (Render logs)
-    SMTP_HOST: str = ""
-    SMTP_PORT: int = 465
-    SMTP_USER: str = ""
-    SMTP_PASS: str = ""
-    SMTP_FROM: str = "noreply@auraiq.app"
+    # Resend API — get free key at resend.com (works on Render free tier)
+    RESEND_API_KEY: str = ""
+    SMTP_FROM: str = "onboarding@resend.dev"
 
     class Config:
         env_file = ".env"
