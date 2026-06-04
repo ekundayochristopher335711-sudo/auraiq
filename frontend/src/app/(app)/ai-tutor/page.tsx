@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Brain, Send, ChevronDown, Sparkles, BookOpen } from "lucide-react";
+import { Brain, Send, ChevronDown, Sparkles, BookOpen, ImagePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { Subject } from "@/lib/api";
@@ -50,6 +50,7 @@ interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  imageUrl?: string;
 }
 
 function TypingIndicator() {
@@ -81,6 +82,9 @@ function MessageBubble({ msg }: { msg: Message }) {
           ? "bg-violet-600 text-white rounded-tr-sm"
           : "bg-[#1a1a1a] text-gray-200 rounded-tl-sm border border-white/8"
       )}>
+        {msg.imageUrl && (
+          <img src={msg.imageUrl} alt="uploaded" className="rounded-xl max-w-[240px] mb-2 block" />
+        )}
         {msg.content}
       </div>
     </div>
@@ -94,8 +98,11 @@ export default function AiTutorPage() {
   const [input, setInput]               = useState("");
   const [loading, setLoading]           = useState(false);
   const [showSubjectMenu, setShowSubjectMenu] = useState(false);
+  const [imagePreview, setImagePreview]       = useState<string | null>(null);
+  const [imageBase64, setImageBase64]         = useState<string>("");
   const messagesEndRef  = useRef<HTMLDivElement>(null);
   const inputRef        = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef    = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     api.subjects.list().then((s: Subject[]) => {
@@ -122,19 +129,44 @@ export default function AiTutorPage() {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, loading]);
 
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      setImagePreview(result);
+      setImageBase64(result.split(",")[1]);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const clearImage = () => {
+    setImagePreview(null);
+    setImageBase64("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
+
   const send = async (text: string) => {
     const msg = text.trim();
-    if (!msg || loading) return;
+    if ((!msg && !imageBase64) || loading) return;
 
-    const userMsg: Message = { id: `u-${Date.now()}`, role: "user", content: msg };
+    const userMsg: Message = {
+      id: `u-${Date.now()}`,
+      role: "user",
+      content: msg,
+      imageUrl: imagePreview ?? undefined,
+    };
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
 
     setMessages((prev) => [...prev, userMsg]);
     setInput("");
+    const imgB64 = imageBase64;
+    clearImage();
     setLoading(true);
 
     try {
-      const res = await api.ai.chat(msg, subject, history);
+      const res = await api.ai.chat(msg, subject, history, imgB64 || undefined);
       setMessages((prev) => [...prev, {
         id: `a-${Date.now()}`,
         role: "assistant",
@@ -246,27 +278,43 @@ export default function AiTutorPage() {
       {/* Input bar */}
       <div className="border-t border-white/8 bg-[#0d0d0d] px-4 py-3.5 shrink-0">
         <div className="max-w-2xl mx-auto">
+          {/* Image preview */}
+          {imagePreview && (
+            <div className="relative inline-block mb-2">
+              <img src={imagePreview} alt="preview" className="h-20 rounded-xl border border-white/10 object-cover" />
+              <button onClick={clearImage}
+                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 rounded-full flex items-center justify-center">
+                <X size={10} className="text-white" />
+              </button>
+            </div>
+          )}
           <div className="flex items-end gap-3 bg-[#141414] border border-white/10 focus-within:border-violet-500/50 rounded-2xl px-4 py-3 transition-colors">
+            {/* Image upload button */}
+            <input ref={fileInputRef} type="file" accept="image/*" onChange={handleImageChange} className="hidden" />
+            <button type="button" onClick={() => fileInputRef.current?.click()}
+              className="text-gray-500 hover:text-violet-400 transition-colors shrink-0 mb-0.5">
+              <ImagePlus size={17} />
+            </button>
             <textarea
               ref={inputRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={`Ask about ${subject}...`}
+              placeholder={imagePreview ? "Add a question about this image..." : `Ask about ${subject || "anything"}...`}
               rows={1}
               className="flex-1 bg-transparent text-sm text-gray-200 placeholder:text-gray-600 resize-none focus:outline-none leading-relaxed"
               style={{ minHeight: "24px", maxHeight: "128px" }}
             />
             <button
               onClick={() => send(input)}
-              disabled={!input.trim() || loading}
+              disabled={(!input.trim() && !imageBase64) || loading}
               className="w-8 h-8 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center transition-colors shrink-0"
             >
               <Send size={14} className="text-white" />
             </button>
           </div>
           <p className="text-xs text-gray-600 mt-2 text-center">
-            Enter to send · Shift+Enter for new line · Powered by GPT-4o
+            Enter to send · Shift+Enter for new line · Powered by Llama 3
           </p>
         </div>
       </div>

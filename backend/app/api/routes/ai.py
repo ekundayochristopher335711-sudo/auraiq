@@ -28,6 +28,7 @@ class ChatRequest(BaseModel):
     message: str
     subject: str = ""
     conversation_history: list = []
+    image_base64: str = ""  # optional base64-encoded image
 
 
 class QuizRequest(BaseModel):
@@ -43,10 +44,20 @@ async def socratic_chat(body: ChatRequest, current_user: User = Depends(get_curr
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
     messages.extend(body.conversation_history[-10:])
-    messages.append({"role": "user", "content": body.message})
+
+    if body.image_base64:
+        model = "llama-3.2-11b-vision-preview" if settings.GROQ_API_KEY else _get_model()
+        user_content = [
+            {"type": "text", "text": body.message or "What does this image show? Explain it in the context of studying."},
+            {"type": "image_url", "image_url": {"url": f"data:image/jpeg;base64,{body.image_base64}"}},
+        ]
+        messages.append({"role": "user", "content": user_content})
+    else:
+        model = _get_model()
+        messages.append({"role": "user", "content": body.message})
 
     response = await _get_client().chat.completions.create(
-        model=_get_model(),
+        model=model,
         messages=messages,
         max_tokens=600,
         temperature=0.7,

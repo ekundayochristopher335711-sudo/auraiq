@@ -110,10 +110,10 @@ export const api = {
     }) => request<{ id: number; accuracy: number }>("/api/sessions/", { method: "POST", body: JSON.stringify(data) }),
   },
   ai: {
-    chat: (message: string, subject: string, history: object[]) =>
+    chat: (message: string, subject: string, history: object[], image_base64?: string) =>
       request<{ reply: string }>("/api/ai/chat", {
         method: "POST",
-        body: JSON.stringify({ message, subject, conversation_history: history }),
+        body: JSON.stringify({ message, subject, conversation_history: history, image_base64: image_base64 ?? "" }),
       }),
     generateQuiz: (topic: string, difficulty: string, count: number) =>
       request<QuizQuestion[]>("/api/ai/generate-quiz", {
