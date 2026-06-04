@@ -30,10 +30,11 @@ export default function RegisterPage() {
     if (strength < 2) { setError("Please choose a stronger password."); return; }
     setLoading(true);
     try {
-      const { data, error } = await supabase.auth.signUp(
-        { email, password },
-        { data: { full_name: fullName } }
-      );
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { full_name: fullName } },
+      });
       if (error) throw error;
 
       if (data?.session?.access_token) {
