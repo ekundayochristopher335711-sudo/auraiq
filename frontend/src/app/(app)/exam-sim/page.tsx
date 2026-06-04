@@ -1,5 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
+import Link from "next/link";
+import { api } from "@/lib/api";
 import { Timer, Flag, ChevronLeft, ChevronRight, Play, CheckCircle, XCircle, BookOpen } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -140,6 +142,8 @@ export default function ExamSimPage() {
   const [current, setCurrent]   = useState(0);
   const [timeLeft, setTimeLeft] = useState(0);
   const [showReview, setShowReview] = useState(false);
+  const [subjects, setSubjects] = useState<string[]>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Start/stop countdown
@@ -160,6 +164,13 @@ export default function ExamSimPage() {
       setPhase("results");
     }
   }, [timeLeft, phase, timed, questions.length]);
+
+  useEffect(() => {
+    api.subjects.list()
+      .then((list) => setSubjects(list.map((subject) => subject.title)))
+      .catch(() => setSubjects([]))
+      .finally(() => setLoadingSubjects(false));
+  }, []);
 
   const startExam = () => {
     const qs = MOCK_QUESTIONS.slice(0, Math.min(qCount, MOCK_QUESTIONS.length));
@@ -201,6 +212,26 @@ export default function ExamSimPage() {
 
   // ── Setup ──────────────────────────────────────────────────────────────────
   if (phase === "setup") {
+    if (!loadingSubjects && subjects.length === 0) {
+      return (
+        <div className="p-6 max-w-2xl">
+          <div className="mb-6">
+            <h1 className="text-xl font-bold text-white">Exam Simulator</h1>
+            <p className="text-sm text-gray-500 mt-0.5">Practice under real exam conditions</p>
+          </div>
+          <div className="rounded-2xl bg-[#141414] border border-white/8 p-8 text-center">
+            <p className="text-lg font-semibold text-white mb-3">Add your first subject</p>
+            <p className="text-sm text-gray-400 mb-6">
+              Create a subject and upload study material to unlock personalized exam practice.
+            </p>
+            <Link href="/subjects" className="inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl px-5 py-3 transition-colors">
+              <BookOpen size={16} /> Create a subject
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     const available = Math.min(qCount, MOCK_QUESTIONS.length);
     return (
       <div className="p-6 max-w-2xl">

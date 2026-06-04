@@ -5,47 +5,6 @@ import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { Subject } from "@/lib/api";
 
-const SUBJECTS: string[] = [];
-
-const SUGGESTIONS: Record<string, string[]> = {
-  "Risk Management": [
-    "Explain Monte Carlo Analysis in simple terms",
-    "What's the difference between qualitative and quantitative risk analysis?",
-    "How do I calculate Expected Monetary Value (EMV)?",
-    "Walk me through the four risk response strategies",
-  ],
-  "Cost Control": [
-    "How do I calculate the Cost Performance Index?",
-    "What is Estimate at Completion (EAC)?",
-    "Explain the difference between EV, AC, and PV",
-    "When is a project considered over budget?",
-  ],
-  "Agile Frameworks": [
-    "What happens in a Sprint Retrospective?",
-    "Explain the difference between Scrum and Kanban",
-    "How is velocity calculated in Scrum?",
-    "What is the role of the Product Owner?",
-  ],
-  "Quality Management": [
-    "What's the difference between quality assurance and quality control?",
-    "Explain the Fishbone diagram",
-    "What is a Control Chart used for?",
-    "Describe the cost of quality concept",
-  ],
-  "Stakeholder Engagement": [
-    "How do I build a stakeholder register?",
-    "What's the difference between a stakeholder and a sponsor?",
-    "How should I handle a resistant stakeholder?",
-    "Explain the power/interest grid",
-  ],
-  "Procurement": [
-    "What is the difference between fixed-price and cost-plus contracts?",
-    "When should I use a Time and Materials contract?",
-    "What is a make-or-buy decision?",
-    "Explain contract termination for convenience",
-  ],
-};
-
 interface Message {
   id: string;
   role: "user" | "assistant";
@@ -106,21 +65,28 @@ export default function AiTutorPage() {
 
   useEffect(() => {
     api.subjects.list().then((s: Subject[]) => {
-      const titles = s.map((s) => s.title);
+      const titles = s.map((subject) => subject.title);
       setSubjects(titles);
-      if (titles.length > 0 && !subject) setSubject(titles[0]);
+      setSubject((current) => current || titles[0] || "");
     }).catch(() => {});
   }, []);
 
-  const suggestions = SUGGESTIONS[subject] ?? [];
+  const suggestions = subject
+    ? [
+      `Explain the key ideas in ${subject}`,
+      `Quiz me on ${subject}`,
+      `Summarize the most important concepts in ${subject}`,
+      `Create a short practice question about ${subject}`,
+    ]
+    : [];
 
   // Reset chat when subject changes
   useEffect(() => {
-    setMessages([{
-      id: "welcome",
-      role: "assistant",
-      content: `Hi! I'm your AI Tutor for **${subject}**.\n\nI use the Socratic method — I'll guide you to understand concepts deeply rather than just giving you answers. Ask me to explain something, work through a practice problem, or quiz you on key topics.\n\nWhat would you like to explore?`,
-    }]);
+    const welcomeMessage = subject
+      ? `Hi! I'm your AI Tutor for **${subject}**.\n\nI use the Socratic method — I'll guide you to understand concepts deeply rather than just giving you answers. Ask me to explain something, work through a practice problem, or quiz you on key topics.\n\nWhat would you like to explore?`
+      : `Hi! I'm your AI Tutor. Create a subject to get study help tailored to your course, or ask me a general study question to get started.`;
+
+    setMessages([{ id: "welcome", role: "assistant", content: welcomeMessage }]);
     setInput("");
   }, [subject]);
 
@@ -223,7 +189,7 @@ export default function AiTutorPage() {
             className="flex items-center gap-2 bg-[#141414] border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 text-sm text-gray-300 transition-colors"
           >
             <BookOpen size={13} className="text-violet-400" />
-            {subject}
+            {subject || "Select a subject"}
             <ChevronDown size={12} className={cn("text-gray-500 transition-transform", showSubjectMenu && "rotate-180")} />
           </button>
           {showSubjectMenu && (
@@ -264,7 +230,7 @@ export default function AiTutorPage() {
           )}
 
           {/* Suggestion chips — only shown after the welcome message */}
-          {messages.length === 1 && !loading && (
+          {messages.length === 1 && !loading && suggestions.length > 0 && (
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2.5 flex items-center gap-1.5">
                 <Sparkles size={11} /> Suggested questions

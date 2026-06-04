@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Zap, Play, Clock, BookOpen, ChevronRight } from "lucide-react";
 import { api, Flashcard } from "@/lib/api";
-import { MOCK_CARDS } from "@/lib/mockCards";
 import { cn } from "@/lib/utils";
 
 const diffColor: Record<string, string> = {
@@ -33,7 +32,7 @@ export default function FlashcardsPage() {
   useEffect(() => {
     api.flashcards.due()
       .then(setCards)
-      .catch(() => setCards(MOCK_CARDS))
+      .catch(() => setCards([]))
       .finally(() => setLoading(false));
   }, []);
 

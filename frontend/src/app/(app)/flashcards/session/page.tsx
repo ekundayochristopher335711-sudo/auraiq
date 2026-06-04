@@ -1,7 +1,6 @@
 "use client";
 import { useEffect, useRef, useState } from "react";
 import { api, Flashcard } from "@/lib/api";
-import { MOCK_CARDS } from "@/lib/mockCards";
 import { FlipCard } from "@/components/flashcards/FlipCard";
 import { RatingBar } from "@/components/flashcards/RatingBar";
 import { SessionProgress } from "@/components/flashcards/SessionProgress";
@@ -21,8 +20,8 @@ export default function SessionPage() {
 
   useEffect(() => {
     api.flashcards.due()
-      .then((data) => setCards(data.length > 0 ? data : MOCK_CARDS))
-      .catch(() => setCards(MOCK_CARDS))
+      .then(setCards)
+      .catch(() => setCards([]))
       .finally(() => setLoading(false));
   }, []);
 
