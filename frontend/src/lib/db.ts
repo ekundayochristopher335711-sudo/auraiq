@@ -41,6 +41,21 @@ export async function deleteSubject(id: number) {
 }
 
 // ── Flashcards ────────────────────────────────────────────────────────────────
+export async function getSubjectFlashcards(subjectId: number) {
+  const { data, error } = await supabase
+    .from("flashcards")
+    .select("*")
+    .eq("subject_id", subjectId)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function deleteFlashcard(id: number) {
+  const { error } = await supabase.from("flashcards").delete().eq("id", id);
+  if (error) throw error;
+}
+
 export async function getDueFlashcards() {
   const { data, error } = await supabase
     .from("flashcards")

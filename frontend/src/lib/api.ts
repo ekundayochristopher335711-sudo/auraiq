@@ -75,11 +75,13 @@ export const api = {
     list: () => db.getSubjects(),
     create: (title: string, description?: string) => db.createSubject(title, description),
     delete: (id: number) => db.deleteSubject(id),
+    getFlashcards: (id: number) => db.getSubjectFlashcards(id),
   },
 
   flashcards: {
     due: () => db.getDueFlashcards(),
     review: (flashcard_id: number, quality: number) => db.reviewFlashcard(flashcard_id, quality),
+    delete: (id: number) => db.deleteFlashcard(id),
   },
 
   sessions: {

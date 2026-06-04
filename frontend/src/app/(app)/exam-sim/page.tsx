@@ -508,10 +508,10 @@ export default function ExamSimPage() {
       </div>
 
       {/* Content */}
-      <div className="flex flex-1 gap-0">
-        {/* Question panel */}
-        <div className="flex-1 p-6 overflow-y-auto">
-          <div className="max-w-2xl mx-auto space-y-5">
+      <div className="flex flex-1 gap-0 min-h-0">
+        {/* Question panel — full width on mobile, shares space with sidebar on lg+ */}
+        <div className="flex-1 min-w-0 p-4 sm:p-6 overflow-y-auto">
+          <div className="max-w-2xl mx-auto space-y-4 sm:space-y-5">
             <div className="flex items-center justify-between">
               <span className="text-xs bg-violet-500/10 text-violet-400 px-2.5 py-1 rounded-full font-medium">
                 {q.topic}
@@ -519,8 +519,8 @@ export default function ExamSimPage() {
               <span className="text-xs text-gray-500">Question {current + 1} of {total}</span>
             </div>
 
-            <div className="rounded-2xl bg-[#141414] border border-white/8 p-5">
-              <p className="text-base text-gray-100 leading-relaxed">{q.question}</p>
+            <div className="rounded-2xl bg-[#141414] border border-white/8 p-4 sm:p-5">
+              <p className="text-sm sm:text-base text-gray-100 leading-relaxed">{q.question}</p>
             </div>
 
             <div className="space-y-2.5">
@@ -531,14 +531,14 @@ export default function ExamSimPage() {
                     key={j}
                     onClick={() => setAnswers((prev) => ({ ...prev, [current]: j }))}
                     className={cn(
-                      "w-full text-left rounded-xl border p-4 text-sm transition-all",
+                      "w-full text-left rounded-xl border p-3 sm:p-4 text-sm transition-all",
                       selected
                         ? "bg-violet-600/15 border-violet-500/40 text-violet-200"
                         : "bg-[#141414] border-white/8 text-gray-300 hover:border-white/15 hover:bg-white/3"
                     )}
                   >
                     <span className={cn(
-                      "inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-3",
+                      "inline-flex items-center justify-center w-5 h-5 rounded-full text-xs font-bold mr-3 shrink-0",
                       selected ? "bg-violet-600 text-white" : "bg-white/8 text-gray-400"
                     )}>
                       {String.fromCharCode(65 + j)}
@@ -560,29 +560,67 @@ export default function ExamSimPage() {
                     : "border-white/8 text-gray-500 hover:text-gray-300 hover:border-white/15"
                 )}
               >
-                <Flag size={12} /> {isFlagged ? "Unflag" : "Flag for Review"}
+                <Flag size={12} /> {isFlagged ? "Unflag" : "Flag"}
               </button>
               <div className="flex gap-2">
                 <button
                   onClick={() => setCurrent((c) => Math.max(0, c - 1))}
                   disabled={current === 0}
-                  className="flex items-center gap-1 text-xs font-medium px-3.5 py-2 rounded-lg border border-white/8 text-gray-400 hover:text-gray-200 hover:border-white/15 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                  className="flex items-center gap-1 text-xs font-medium px-3 sm:px-3.5 py-2 rounded-lg border border-white/8 text-gray-400 hover:text-gray-200 hover:border-white/15 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                 >
                   <ChevronLeft size={13} /> Prev
                 </button>
                 <button
                   onClick={() => current === total - 1 ? submitExam() : setCurrent((c) => c + 1)}
-                  className="flex items-center gap-1 text-xs font-semibold px-3.5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors"
+                  className="flex items-center gap-1 text-xs font-semibold px-3 sm:px-3.5 py-2 rounded-lg bg-violet-600 hover:bg-violet-500 text-white transition-colors"
                 >
                   {current === total - 1 ? "Finish" : "Next"} <ChevronRight size={13} />
                 </button>
               </div>
             </div>
+
+            {/* Mobile question grid — hidden on desktop where sidebar handles this */}
+            <div className="lg:hidden border-t border-white/8 pt-4">
+              <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-2">Jump to question</p>
+              <div className="grid grid-cols-10 gap-1 mb-3">
+                {questions.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setCurrent(i)}
+                    className={cn(
+                      "aspect-square w-full rounded-md text-xs font-medium transition-all",
+                      i === current
+                        ? "bg-violet-600 text-white"
+                        : flagged.has(i)
+                        ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                        : answers[i] !== undefined
+                        ? "bg-violet-500/20 text-violet-300"
+                        : "bg-white/5 text-gray-500"
+                    )}
+                  >
+                    {i + 1}
+                  </button>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                {[
+                  { bg: "bg-violet-600", label: "Current" },
+                  { bg: "bg-violet-500/20 border border-violet-500/30", label: "Answered" },
+                  { bg: "bg-amber-500/20 border border-amber-500/30", label: "Flagged" },
+                  { bg: "bg-white/5", label: "Unanswered" },
+                ].map(({ bg, label }) => (
+                  <div key={label} className="flex items-center gap-1.5">
+                    <div className={cn("w-3 h-3 rounded", bg)} />
+                    {label}
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Question navigator */}
-        <div className="w-52 shrink-0 border-l border-white/8 bg-[#0d0d0d] p-4 sticky top-[61px] self-start">
+        {/* Desktop question navigator — hidden on mobile */}
+        <div className="hidden lg:block w-52 shrink-0 border-l border-white/8 bg-[#0d0d0d] p-4 sticky top-[61px] self-start">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Questions</p>
           <div className="grid grid-cols-5 gap-1.5 mb-4">
             {questions.map((_, i) => (

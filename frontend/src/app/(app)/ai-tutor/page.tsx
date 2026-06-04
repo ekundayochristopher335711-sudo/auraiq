@@ -190,29 +190,29 @@ export default function AiTutorPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/8 bg-[#0d0d0d] shrink-0">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center">
+      <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/8 bg-[#0d0d0d] shrink-0 relative z-30">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-violet-600 flex items-center justify-center shrink-0">
             <Brain size={16} className="text-white" />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm font-semibold text-white">AI Tutor</p>
-            <p className="text-xs text-gray-500">Socratic learning companion</p>
+            <p className="text-xs text-gray-500 hidden sm:block">Socratic learning companion</p>
           </div>
         </div>
 
         {/* Subject selector */}
-        <div className="relative">
+        <div className="relative shrink-0">
           <button
             onClick={() => setShowSubjectMenu((v) => !v)}
-            className="flex items-center gap-2 bg-[#141414] border border-white/10 hover:border-white/20 rounded-xl px-3 py-2 text-sm text-gray-300 transition-colors"
+            className="flex items-center gap-1.5 bg-[#141414] border border-white/10 hover:border-white/20 rounded-xl px-2.5 py-2 text-sm text-gray-300 transition-colors max-w-[160px] sm:max-w-none"
           >
-            <BookOpen size={13} className="text-violet-400" />
-            {subject || "Select a subject"}
-            <ChevronDown size={12} className={cn("text-gray-500 transition-transform", showSubjectMenu && "rotate-180")} />
+            <BookOpen size={13} className="text-violet-400 shrink-0" />
+            <span className="truncate">{subject || "Select"}</span>
+            <ChevronDown size={12} className={cn("text-gray-500 transition-transform shrink-0", showSubjectMenu && "rotate-180")} />
           </button>
           {showSubjectMenu && (
-            <div className="absolute right-0 top-full mt-1 w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-20 overflow-hidden">
+            <div className="absolute right-0 top-full mt-1 w-56 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
               {subjects.length === 0 ? (
                 <p className="text-xs text-gray-500 px-4 py-3">No subjects yet — create one first</p>
               ) : subjects.map((s) => (
@@ -273,7 +273,7 @@ export default function AiTutorPage() {
               <p className="text-xs text-gray-500 mb-2.5 flex items-center gap-1.5">
                 <Sparkles size={11} /> Suggested questions
               </p>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-2">
                 {suggestions.map((s) => (
                   <button
                     key={s}

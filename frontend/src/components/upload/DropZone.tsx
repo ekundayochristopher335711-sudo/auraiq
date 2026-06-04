@@ -18,7 +18,7 @@ export function DropZone({ onFile, disabled }: DropZoneProps) {
 
   const validate = (file: File): string => {
     if (!ACCEPTED.includes(file.type)) return "Only PDF, DOCX, and TXT files are supported.";
-    if (file.size > 20 * 1024 * 1024) return "File too large — maximum size is 20 MB.";
+    if (file.size > 30 * 1024 * 1024) return "File too large — maximum size is 30 MB.";
     return "";
   };
 
@@ -89,7 +89,7 @@ export function DropZone({ onFile, disabled }: DropZoneProps) {
           <p className="text-sm font-medium text-gray-300">
             {dragging ? "Drop it!" : "Drag & drop your study material"}
           </p>
-          <p className="text-xs text-gray-600 mt-1">PDF, DOCX, or TXT · max 20 MB</p>
+          <p className="text-xs text-gray-600 mt-1">PDF, DOCX, or TXT · max 30 MB</p>
         </div>
         <span className="text-xs bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg px-3 py-1.5 text-gray-400 transition-colors">
           Browse files

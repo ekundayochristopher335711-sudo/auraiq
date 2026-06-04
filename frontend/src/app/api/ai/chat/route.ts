@@ -30,7 +30,7 @@ export async function POST(req: NextRequest) {
   const { message, subject, conversation_history = [], image_base64 } = await req.json();
 
   const { client, model } = getAIClient();
-  const visionModel = process.env.GROQ_API_KEY ? "llama-3.2-11b-vision-preview" : "gpt-4o-mini";
+  const visionModel = process.env.GROQ_API_KEY ? "meta-llama/llama-4-scout-17b-16e-instruct" : "gpt-4o-mini";
 
   const messages: any[] = [
     { role: "system", content: SYSTEM_PROMPT },
