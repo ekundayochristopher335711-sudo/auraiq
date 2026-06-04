@@ -1,29 +1,26 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "";
+import { supabase } from "./supabaseClient";
+import * as db from "./db";
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const token = typeof window !== "undefined" ? localStorage.getItem("auraiq_token") : null;
+// ── Auth helper for Next.js API routes ────────────────────────────────────────
+async function authHeaders(): Promise<HeadersInit> {
+  const { data: { session } } = await supabase.auth.getSession();
+  return session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {};
+}
+
+async function apiRequest<T>(path: string, options: RequestInit = {}): Promise<T> {
+  const headers = await authHeaders();
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 70000);
   let res: Response;
   try {
-    res = await fetch(`${BASE_URL}${path}`, {
+    res = await fetch(path, {
       ...options,
       signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...options?.headers,
-      },
+      headers: { "Content-Type": "application/json", ...headers, ...options.headers },
     });
-  } catch (error: any) {
+  } catch (err: any) {
     clearTimeout(timeout);
-    if (controller.signal.aborted) {
-      throw new Error("Request timed out after 70 seconds. The backend may still be waking up.");
-    }
-    if (error?.name === "TypeError") {
-      throw new Error("Unable to reach the backend. Please check your network or wait a moment and try again.");
-    }
-    throw new Error(error?.message ?? "Unable to reach the backend.");
+    throw new Error("Server is waking up — please wait a moment and try again.");
   }
   clearTimeout(timeout);
   if (!res.ok) {
@@ -33,57 +30,52 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json();
 }
 
+// ── Public API ────────────────────────────────────────────────────────────────
 export const api = {
   auth: {
-    register: (email: string, full_name: string, password: string) =>
-      request<{ email: string; access_token?: string; token_type?: string }>("/api/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email, full_name, password }),
-      }),
-    login: (email: string, password: string) =>
-      request<{ access_token: string }>("/api/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password }),
-      }),
-    me: () => request<{ id: number; email: string; full_name: string; plan: string; study_streak: number }>("/api/auth/me"),
-    verifyOTP: (email: string, code: string, purpose: string) =>
-      request<{ access_token?: string; verified?: boolean; message?: string }>("/api/auth/verify-otp", {
-        method: "POST",
-        body: JSON.stringify({ email, code, purpose }),
-      }),
-    resendOTP: (email: string, purpose: string) =>
-      request<{ message: string }>("/api/auth/resend-otp", {
-        method: "POST",
-        body: JSON.stringify({ email, purpose }),
-      }),
-    forgotPassword: (email: string) =>
-      request<{ message: string }>("/api/auth/forgot-password", {
-        method: "POST",
-        body: JSON.stringify({ email }),
-      }),
-    resetPassword: (email: string, code: string, new_password: string) =>
-      request<{ message: string }>("/api/auth/reset-password", {
-        method: "POST",
-        body: JSON.stringify({ email, code, new_password }),
-      }),
+    me: async () => {
+      const profile = await db.getProfile();
+      return {
+        id: profile.id,
+        email: profile.email ?? "",
+        full_name: profile.full_name ?? "",
+        plan: profile.plan ?? "free",
+        study_streak: profile.study_streak ?? 0,
+      };
+    },
+    // register/login handled by Supabase Auth in AuthContext
+    register: async () => {},
+    login: async () => {},
   },
+
   dashboard: {
-    get: () => request<DashboardData>("/api/mastery/dashboard"),
+    get: () => db.getDashboard(),
   },
+
   subjects: {
-    list: () => request<Subject[]>("/api/subjects/"),
-    create: (title: string, description?: string) =>
-      request<Subject>("/api/subjects/", { method: "POST", body: JSON.stringify({ title, description }) }),
-    delete: (id: number) => request<void>(`/api/subjects/${id}`, { method: "DELETE" }),
+    list: () => db.getSubjects(),
+    create: (title: string, description?: string) => db.createSubject(title, description),
+    delete: (id: number) => db.deleteSubject(id),
   },
+
+  flashcards: {
+    due: () => db.getDueFlashcards(),
+    review: (flashcard_id: number, quality: number) => db.reviewFlashcard(flashcard_id, quality),
+  },
+
+  sessions: {
+    create: (data: { subject_id?: number; duration_minutes: number; cards_reviewed: number; correct_answers: number }) =>
+      db.createSession(data),
+  },
+
   upload: {
     extract: async (file: File): Promise<{ preview: ExtractedContent; char_count: number }> => {
-      const token = localStorage.getItem("auraiq_token");
+      const headers = await authHeaders();
       const form = new FormData();
       form.append("file", file);
-      const res = await fetch(`${BASE_URL}/api/upload/extract`, {
+      const res = await fetch("/api/upload/extract", {
         method: "POST",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: headers as Record<string, string>,
         body: form,
       });
       if (!res.ok) {
@@ -93,42 +85,27 @@ export const api = {
       return res.json();
     },
     save: (preview: ExtractedContent) =>
-      request<{ subject_id: number; title: string; modules: number; flashcards_created: number }>(
+      apiRequest<{ subject_id: number; title: string; modules: number; flashcards_created: number }>(
         "/api/upload/save",
         { method: "POST", body: JSON.stringify({ preview }) }
       ),
   },
-  flashcards: {
-    due: () => request<Flashcard[]>("/api/flashcards/due"),
-    review: (flashcard_id: number, quality: number) =>
-      request<{ next_review_at: string; interval_days: number }>("/api/flashcards/review", {
-        method: "POST",
-        body: JSON.stringify({ flashcard_id, quality }),
-      }),
-  },
-  sessions: {
-    create: (data: {
-      subject_id?: number;
-      duration_minutes: number;
-      cards_reviewed: number;
-      correct_answers: number;
-      topic_scores?: Record<string, number>;
-    }) => request<{ id: number; accuracy: number }>("/api/sessions/", { method: "POST", body: JSON.stringify(data) }),
-  },
+
   ai: {
     chat: (message: string, subject: string, history: object[], image_base64?: string) =>
-      request<{ reply: string }>("/api/ai/chat", {
+      apiRequest<{ reply: string }>("/api/ai/chat", {
         method: "POST",
         body: JSON.stringify({ message, subject, conversation_history: history, image_base64: image_base64 ?? "" }),
       }),
     generateQuiz: (topic: string, difficulty: string, count: number) =>
-      request<QuizQuestion[]>("/api/ai/generate-quiz", {
+      apiRequest<QuizQuestion[]>("/api/ai/quiz", {
         method: "POST",
         body: JSON.stringify({ topic, difficulty, count }),
       }),
   },
 };
 
+// ── Types ─────────────────────────────────────────────────────────────────────
 export interface DashboardData {
   stats: {
     exam_readiness: number;
@@ -159,32 +136,8 @@ export interface Subject {
   mastery_score: number;
 }
 
-export interface ExtractedFlashcard {
-  question: string;
-  answer: string;
-  difficulty: "easy" | "medium" | "hard";
-}
-
-export interface ExtractedConcept {
-  title: string;
-  explanation: string;
-}
-
-export interface ExtractedModule {
-  title: string;
-  concepts: ExtractedConcept[];
-  flashcards: ExtractedFlashcard[];
-}
-
-export interface ExtractedContent {
-  subject_title: string;
-  subject_description: string;
-  modules: ExtractedModule[];
-}
-
-export interface QuizQuestion {
-  question: string;
-  options: string[];
-  answer: string;
-  explanation: string;
-}
+export interface ExtractedFlashcard { question: string; answer: string; difficulty: "easy" | "medium" | "hard"; }
+export interface ExtractedConcept { title: string; explanation: string; }
+export interface ExtractedModule { title: string; concepts: ExtractedConcept[]; flashcards: ExtractedFlashcard[]; }
+export interface ExtractedContent { subject_title: string; subject_description: string; modules: ExtractedModule[]; }
+export interface QuizQuestion { question: string; options: string[]; answer: string; explanation: string; }
