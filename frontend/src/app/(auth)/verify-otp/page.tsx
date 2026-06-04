@@ -1,8 +1,9 @@
 "use client";
+import { Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Brain, Mail } from "lucide-react";
 
-export default function VerifyOTPPage() {
+function VerifyOTPContent() {
   const router = useRouter();
   const params = useSearchParams();
   const email  = params.get("email") ?? "";
@@ -21,14 +22,10 @@ export default function VerifyOTPPage() {
           <Mail size={24} className="text-violet-400" />
         </div>
         <h1 className="text-xl font-bold text-white mb-2">Check your email</h1>
-        <p className="text-sm text-gray-400 leading-relaxed mb-2">
-          We sent a confirmation link to
-        </p>
-        <p className="text-sm font-medium text-white mb-6">
-          {email || "your email address"}
-        </p>
+        <p className="text-sm text-gray-400 leading-relaxed mb-2">We sent a confirmation link to</p>
+        <p className="text-sm font-medium text-white mb-6">{email || "your email address"}</p>
         <p className="text-sm text-gray-500 leading-relaxed mb-8">
-          Open the email and click the confirmation link to activate your account. Then come back and sign in.
+          Click the link in the email to activate your account, then come back and sign in.
         </p>
         <button
           onClick={() => router.push("/login")}
@@ -38,5 +35,13 @@ export default function VerifyOTPPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function VerifyOTPPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center items-center min-h-screen"><div className="flex gap-1.5">{[0,1,2].map(i=><div key={i} className="w-2 h-2 rounded-full bg-violet-500 animate-bounce" style={{animationDelay:`${i*0.15}s`}}/>)}</div></div>}>
+      <VerifyOTPContent />
+    </Suspense>
   );
 }

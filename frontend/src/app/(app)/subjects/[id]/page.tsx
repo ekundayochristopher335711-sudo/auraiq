@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Zap, Brain, ChevronDown, ChevronRight, Upload, Plus, Loader2 } from "lucide-react";
@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 
 type UploadStep = "idle" | "uploading" | "preview" | "saving";
 
-export default function SubjectDetailPage() {
+function SubjectDetailContent() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -180,5 +180,13 @@ export default function SubjectDetailPage() {
         </button>
       </div>
     </div>
+  );
+}
+
+export default function SubjectDetailPage() {
+  return (
+    <Suspense fallback={null}>
+      <SubjectDetailContent />
+    </Suspense>
   );
 }

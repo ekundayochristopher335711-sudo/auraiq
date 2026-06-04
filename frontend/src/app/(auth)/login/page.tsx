@@ -1,11 +1,11 @@
 "use client";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Brain, Eye, EyeOff, Loader2, AlertCircle } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-export default function LoginPage() {
+function LoginContent() {
   const { login } = useAuth();
   const params = useSearchParams();
   const router = useRouter();
@@ -97,5 +97,13 @@ export default function LoginPage() {
         <Link href="/register" className="text-violet-400 hover:text-violet-300 font-medium transition-colors">Create one free</Link>
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={null}>
+      <LoginContent />
+    </Suspense>
   );
 }
