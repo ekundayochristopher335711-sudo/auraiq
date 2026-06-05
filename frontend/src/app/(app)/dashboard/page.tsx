@@ -33,14 +33,12 @@ export default function DashboardPage() {
         .catch(() => { setRealSubjects([]); }),
     ]).finally(() => setLoading(false));
 
-    // Live card count via Supabase realtime
+    // Refresh dashboard on any flashcard or session change
+    const refresh = () => { api.dashboard.get().then(setData).catch(() => {}); };
     const channel = supabase
-      .channel("dashboard-flashcards")
-      .on(
-        "postgres_changes",
-        { event: "*", schema: "public", table: "flashcards" },
-        () => { api.dashboard.get().then(setData).catch(() => {}); }
-      )
+      .channel("dashboard-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "flashcards" }, refresh)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "study_sessions" }, refresh)
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
@@ -154,17 +152,17 @@ export default function DashboardPage() {
             {showBell && (
               <>
                 <div className="fixed inset-0 z-30" onClick={() => setShowBell(false)} />
-                <div className="absolute right-0 top-11 z-40 w-72 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-white/8">
+                <div className="absolute right-0 top-11 z-40 w-80 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/8 flex items-center justify-between">
                     <p className="text-sm font-semibold text-white">Notifications</p>
+                    {stats.cards_due_today > 0 && (
+                      <span className="text-[10px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full">{stats.cards_due_today}</span>
+                    )}
                   </div>
-                  {stats.cards_due_today > 0 ? (
-                    <div className="p-2">
-                      <Link
-                        href="/flashcards"
-                        onClick={() => setShowBell(false)}
-                        className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors"
-                      >
+                  <div className="p-2 space-y-1">
+                    {stats.cards_due_today > 0 && (
+                      <Link href="/flashcards" onClick={() => setShowBell(false)}
+                        className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors">
                         <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0 mt-0.5">
                           <Zap size={14} className="text-violet-400" />
                         </div>
@@ -172,16 +170,47 @@ export default function DashboardPage() {
                           <p className="text-sm text-gray-200 font-medium">
                             {stats.cards_due_today} card{stats.cards_due_today !== 1 ? "s" : ""} due for review
                           </p>
-                          <p className="text-xs text-gray-500 mt-0.5">Tap to start your review session</p>
+                          <p className="text-xs text-gray-500 mt-0.5">Tap to start your review session now</p>
                         </div>
                       </Link>
-                    </div>
-                  ) : (
-                    <div className="flex flex-col items-center py-8 text-center px-4">
-                      <p className="text-sm text-gray-400 font-medium">You're all caught up!</p>
-                      <p className="text-xs text-gray-600 mt-1">No pending notifications right now.</p>
-                    </div>
-                  )}
+                    )}
+                    {stats.study_streak > 0 && (
+                      <div className="flex items-start gap-3 px-3 py-3 rounded-xl">
+                        <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                          <Flame size={14} className="text-amber-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-200 font-medium">
+                            {stats.study_streak} day streak — keep it going!
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">Review today to maintain your streak</p>
+                        </div>
+                      </div>
+                    )}
+                    {subjects.some((s) => s.mastery_score < 0.4) && (
+                      <Link href="/subjects" onClick={() => setShowBell(false)}
+                        className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors">
+                        <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                          <Target size={14} className="text-red-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-200 font-medium">Weak areas need attention</p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {subjects.filter((s) => s.mastery_score < 0.4).map((s) => s.title).join(", ")}
+                          </p>
+                        </div>
+                      </Link>
+                    )}
+                    {stats.cards_due_today === 0 && stats.study_streak === 0 && !subjects.some((s) => s.mastery_score < 0.4) && (
+                      <div className="flex flex-col items-center py-8 text-center px-4">
+                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2">
+                          <Zap size={16} className="text-emerald-400" />
+                        </div>
+                        <p className="text-sm text-gray-400 font-medium">You&apos;re all caught up!</p>
+                        <p className="text-xs text-gray-600 mt-1">No pending notifications right now.</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </>
             )}

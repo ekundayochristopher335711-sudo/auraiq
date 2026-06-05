@@ -140,15 +140,17 @@ export async function getDashboard() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const [profileRes, sessionsRes, cardsRes] = await Promise.all([
+  const [profileRes, sessionsRes, cardsRes, subjectsRes] = await Promise.all([
     supabase.from("profiles").select("study_streak, plan").eq("id", user.id).single(),
     supabase.from("study_sessions").select("accuracy, created_at, cards_reviewed, correct_answers").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
-    supabase.from("flashcards").select("id, next_review_at, difficulty, subjects(title)").eq("user_id", user.id),
+    supabase.from("flashcards").select("id, next_review_at, difficulty, question, subjects(title)").eq("user_id", user.id),
+    supabase.from("subjects").select("id, title, mastery_score").eq("user_id", user.id).order("mastery_score", { ascending: true }),
   ]);
 
   const profile = profileRes.data ?? { study_streak: 0, plan: "free" };
   const sessions = sessionsRes.data ?? [];
   const cards = cardsRes.data ?? [];
+  const subjectsList = subjectsRes.data ?? [];
 
   const now = new Date();
   const cards_due_today = cards.filter((c) => c.next_review_at && new Date(c.next_review_at) <= now).length;
@@ -157,10 +159,38 @@ export async function getDashboard() {
     ? sessions.reduce((s, r) => s + (r.accuracy ?? 0), 0) / sessions.length
     : 0;
 
-  const performance_trend = sessions.slice(0, 14).reverse().map((s) => ({
+  const performance_trend = sessions.slice(0, 30).reverse().map((s) => ({
     date: new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     score: Math.round((s.accuracy ?? 0) * 100),
   }));
+
+  // Real topic scores from subjects table
+  const topic_scores = subjectsList.map((s) => {
+    const score = Math.round((s.mastery_score ?? 0) * 100);
+    return {
+      topic: s.title,
+      score,
+      status: score >= 75 ? "strong" : score >= 45 ? "moderate" : "weak",
+    };
+  });
+
+  // Real forgetting forecasts: cards due within next 24 hours or already overdue
+  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  const forgetting_forecasts = cards
+    .filter((c) => c.next_review_at && new Date(c.next_review_at) <= in24h)
+    .sort((a, b) => new Date(a.next_review_at!).getTime() - new Date(b.next_review_at!).getTime())
+    .slice(0, 5)
+    .map((c) => {
+      const due = new Date(c.next_review_at!);
+      const isOverdue = due <= now;
+      const hoursLeft = isOverdue ? 0 : Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60));
+      return {
+        concept: ((c as any).question ?? "Flashcard").slice(0, 55),
+        subject: ((c as any).subjects as any)?.title ?? "General",
+        hours_until_forgotten: hoursLeft,
+        urgency: isOverdue ? "critical" : hoursLeft < 4 ? "high" : "medium",
+      };
+    });
 
   return {
     stats: {
@@ -172,8 +202,8 @@ export async function getDashboard() {
       last_session_accuracy,
       plan: profile.plan ?? "free",
     },
-    topic_scores: [],
-    forgetting_forecasts: [],
+    topic_scores,
+    forgetting_forecasts,
     performance_trend,
   };
 }

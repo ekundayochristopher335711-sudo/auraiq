@@ -1,4 +1,5 @@
 import { Clock, AlertTriangle, Zap } from "lucide-react";
+import Link from "next/link";
 import { cn } from "@/lib/utils";
 
 interface Forecast {
@@ -27,9 +28,9 @@ export function ForgettingForecast({ forecasts, queueCount }: ForgettingForecast
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider">Forgetting Forecast™</p>
           <p className="text-sm text-gray-300 mt-0.5">{queueCount} cards due for review</p>
         </div>
-        <button className="text-xs bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 px-3 py-1.5 rounded-lg font-medium transition-colors">
+        <Link href="/flashcards" className="text-xs bg-violet-600/20 hover:bg-violet-600/30 text-violet-400 px-3 py-1.5 rounded-lg font-medium transition-colors">
           Start Review
-        </button>
+        </Link>
       </div>
 
       {forecasts.length === 0 ? (

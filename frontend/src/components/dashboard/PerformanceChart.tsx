@@ -21,11 +21,15 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
+type Period = "Week" | "Month" | "Year";
+
 export function PerformanceChart({ data }: PerformanceChartProps) {
   const [mounted, setMounted] = useState(false);
+  const [period, setPeriod] = useState<Period>("Month");
   useEffect(() => setMounted(true), []);
 
-  const filled = data.length > 0 ? data : [
+  const sliced = period === "Week" ? data.slice(-7) : period === "Month" ? data.slice(-30) : data;
+  const filled = sliced.length > 0 ? sliced : [
     { date: "Mon", score: 0 }, { date: "Tue", score: 0 }, { date: "Wed", score: 0 },
     { date: "Thu", score: 0 }, { date: "Fri", score: 0 }, { date: "Sat", score: 0 }, { date: "Sun", score: 0 },
   ];
@@ -38,8 +42,8 @@ export function PerformanceChart({ data }: PerformanceChartProps) {
           <p className="text-sm text-gray-300 mt-0.5">Accuracy trend over sessions</p>
         </div>
         <div className="flex gap-1">
-          {["Week", "Month", "Year"].map((t) => (
-            <button key={t} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${t === "Week" ? "bg-violet-600/20 text-violet-400" : "text-gray-500 hover:text-gray-300 hover:bg-white/5"}`}>
+          {(["Week", "Month", "Year"] as Period[]).map((t) => (
+            <button key={t} onClick={() => setPeriod(t)} className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${t === period ? "bg-violet-600/20 text-violet-400" : "text-gray-500 hover:text-gray-300 hover:bg-white/5"}`}>
               {t}
             </button>
           ))}
