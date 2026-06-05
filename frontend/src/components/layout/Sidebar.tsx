@@ -151,6 +151,17 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             </div>
           )}
 
+          {/* ARLOTECH credit */}
+          <div className="px-3 pt-1 pb-0.5">
+            <p className="text-[10px] text-gray-700 text-center">
+              Built by{" "}
+              <span className="font-bold tracking-wide"
+                style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+                ARLOTECH
+              </span>
+            </p>
+          </div>
+
           {/* User row */}
           <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mt-2 group">
             <div className="w-7 h-7 rounded-full overflow-hidden shrink-0">
