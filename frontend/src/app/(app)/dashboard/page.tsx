@@ -22,6 +22,8 @@ export default function DashboardPage() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [realSubjects, setRealSubjects]     = useState<Subject[] | null>(null);
   const [activeTab, setActiveTab]           = useState<Tab>("Overview");
+  const [searchQuery, setSearchQuery]       = useState("");
+  const [showBell, setShowBell]             = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -50,6 +52,12 @@ export default function DashboardPage() {
   };
 
   const isNewUser = realSubjects !== null && realSubjects.length === 0;
+  const filteredSubjects = searchQuery.trim()
+    ? subjects.filter((s) =>
+        s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.description ?? "").toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    : subjects;
 
   if (loading) {
     return (
@@ -94,26 +102,107 @@ export default function DashboardPage() {
         </div>
       )}
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <h1 className="text-xl font-bold text-white">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-0.5">Executive Overview</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
+        <div className="flex items-center gap-2 shrink-0">
+          {/* Search — filters subjects across all tabs */}
+          <div className="relative hidden sm:block">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search concepts..."
-              className="bg-[#141414] border border-white/8 rounded-xl pl-9 pr-4 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-violet-500/50 w-52"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search subjects..."
+              className="bg-[#141414] border border-white/8 rounded-xl pl-9 pr-4 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-violet-500/50 w-44"
             />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors text-xs"
+              >✕</button>
+            )}
           </div>
-          <button className="relative w-9 h-9 rounded-xl bg-[#141414] border border-white/8 flex items-center justify-center hover:bg-white/5 transition-colors">
-            <Bell size={15} className="text-gray-400" />
-            <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-violet-500" />
-          </button>
+
+          {/* Bell — notification panel */}
+          <div className="relative">
+            <button
+              onClick={() => setShowBell((v) => !v)}
+              className="relative w-9 h-9 rounded-xl bg-[#141414] border border-white/8 flex items-center justify-center hover:bg-white/5 transition-colors"
+            >
+              <Bell size={15} className="text-gray-400" />
+              {stats.cards_due_today > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-violet-500" />
+              )}
+            </button>
+            {showBell && (
+              <>
+                <div className="fixed inset-0 z-30" onClick={() => setShowBell(false)} />
+                <div className="absolute right-0 top-11 z-40 w-72 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/8">
+                    <p className="text-sm font-semibold text-white">Notifications</p>
+                  </div>
+                  {stats.cards_due_today > 0 ? (
+                    <div className="p-2">
+                      <Link
+                        href="/flashcards"
+                        onClick={() => setShowBell(false)}
+                        className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors"
+                      >
+                        <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0 mt-0.5">
+                          <Zap size={14} className="text-violet-400" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-200 font-medium">
+                            {stats.cards_due_today} card{stats.cards_due_today !== 1 ? "s" : ""} due for review
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">Tap to start your review session</p>
+                        </div>
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="flex flex-col items-center py-8 text-center px-4">
+                      <p className="text-sm text-gray-400 font-medium">You're all caught up!</p>
+                      <p className="text-xs text-gray-600 mt-1">No pending notifications right now.</p>
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Mobile search */}
+      <div className="sm:hidden relative">
+        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
+        <input
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search subjects..."
+          className="w-full bg-[#141414] border border-white/8 rounded-xl pl-9 pr-4 py-2 text-sm text-gray-300 placeholder:text-gray-600 focus:outline-none focus:border-violet-500/50"
+        />
+        {searchQuery && (
+          <button onClick={() => setSearchQuery("")} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 text-xs">✕</button>
+        )}
+      </div>
+
+      {/* Search results banner */}
+      {searchQuery.trim() && (
+        <div className="rounded-xl bg-violet-500/10 border border-violet-500/20 px-4 py-2.5 flex items-center justify-between">
+          <p className="text-sm text-violet-300">
+            {filteredSubjects.length > 0
+              ? `${filteredSubjects.length} subject${filteredSubjects.length !== 1 ? "s" : ""} matching "${searchQuery}"`
+              : `No subjects match "${searchQuery}"`}
+          </p>
+          <Link href="/subjects" className="text-xs text-violet-400 hover:text-violet-300 underline underline-offset-2">
+            View all subjects
+          </Link>
+        </div>
+      )}
 
       {/* Tab nav */}
       <div className="flex gap-1 border-b border-white/8 overflow-x-auto scrollbar-hide">
@@ -159,7 +248,7 @@ export default function DashboardPage() {
               masteryPct={stats.mastery_percentage}
             />
             <ForgettingForecast forecasts={forgetting_forecasts as any} queueCount={stats.daily_review_queue} />
-            <TopAssetsCard subjects={subjects} />
+            <TopAssetsCard subjects={filteredSubjects} />
           </div>
         </div>
       )}
@@ -174,11 +263,11 @@ export default function DashboardPage() {
           />
           <PerformanceChart data={performance_trend} />
           <WeaknessHeatmap topics={topic_scores as any} />
-          {subjects.length > 0 && (
+          {filteredSubjects.length > 0 && (
             <div className="rounded-2xl bg-[#141414] border border-white/8 p-5">
               <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">Subject Breakdown</p>
               <div className="space-y-3">
-                {subjects.map((s) => {
+                {filteredSubjects.map((s) => {
                   const pct = Math.round(s.mastery_score * 100);
                   return (
                     <div key={s.id}>

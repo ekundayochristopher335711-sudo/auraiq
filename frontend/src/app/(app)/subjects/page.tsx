@@ -50,9 +50,9 @@ function SubjectCard({ subject, index, onDelete }: { subject: Subject; index: nu
   const statusColor = pct >= 75 ? "text-emerald-400" : pct >= 45 ? "text-amber-400" : "text-red-400";
 
   return (
-    <div className="group rounded-2xl bg-[#141414] border border-white/8 overflow-hidden hover:border-white/15 transition-all">
+    <div className="group relative rounded-2xl bg-[#141414] border border-white/8 overflow-visible hover:border-white/15 transition-all">
       {/* Color bar */}
-      <div className={cn("h-1.5 w-full bg-gradient-to-r", gradient)} />
+      <div className={cn("h-1.5 w-full bg-gradient-to-r rounded-t-2xl", gradient)} />
 
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
@@ -70,7 +70,7 @@ function SubjectCard({ subject, index, onDelete }: { subject: Subject; index: nu
           <div className="relative">
             <button
               onClick={() => setMenuOpen(!menuOpen)}
-              className="opacity-0 group-hover:opacity-100 w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-all"
+              className="w-7 h-7 rounded-lg hover:bg-white/10 flex items-center justify-center text-gray-500 hover:text-gray-300 transition-all"
             >
               <MoreHorizontal size={15} />
             </button>
