@@ -153,8 +153,14 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
           {/* User row */}
           <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl mt-2 group">
-            <div className="w-7 h-7 rounded-full bg-linear-to-br from-violet-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white shrink-0">
-              {initials}
+            <div className="w-7 h-7 rounded-full overflow-hidden shrink-0">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt="avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="w-full h-full bg-linear-to-br from-violet-500 to-pink-500 flex items-center justify-center text-xs font-bold text-white">
+                  {initials}
+                </div>
+              )}
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-medium text-gray-200 truncate">{user?.full_name ?? "Loading..."}</p>
