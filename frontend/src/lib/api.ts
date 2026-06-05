@@ -91,19 +91,38 @@ export const api = {
 
   upload: {
     extract: async (file: File): Promise<{ preview: ExtractedContent; char_count: number }> => {
-      const headers = await authHeaders();
-      const form = new FormData();
-      form.append("file", file);
-      const res = await fetch("/api/upload/extract", {
-        method: "POST",
-        headers: headers as Record<string, string>,
-        body: form,
-      });
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ detail: "Upload failed" }));
-        throw new Error(err.detail ?? "Upload failed");
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error("Not authenticated");
+
+      // Upload directly to Supabase Storage — bypasses Vercel's 4.5 MB body limit
+      const storagePath = `${session.user.id}/${Date.now()}_${file.name}`;
+      const { error: storageError } = await supabase.storage
+        .from("uploads")
+        .upload(storagePath, file, { upsert: true });
+
+      if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`);
+
+      let result: { preview: ExtractedContent; char_count: number };
+      try {
+        const res = await fetch("/api/upload/extract", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ storageKey: storagePath, fileName: file.name }),
+        });
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ detail: "Upload failed" }));
+          throw new Error(err.detail ?? "Upload failed");
+        }
+        result = await res.json();
+      } catch (err) {
+        // Clean up on failure
+        supabase.storage.from("uploads").remove([storagePath]).then(() => {});
+        throw err;
       }
-      return res.json();
+      return result;
     },
     save: (preview: ExtractedContent) =>
       apiRequest<{ subject_id: number; title: string; modules: number; flashcards_created: number }>(

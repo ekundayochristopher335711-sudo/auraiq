@@ -5,16 +5,12 @@ import OpenAI from "openai";
 export const runtime = "nodejs";
 export const maxDuration = 120;
 
-async function getUser(req: NextRequest) {
-  const token = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (!token) return null;
-  const supabase = createClient(
+function getSupabaseUser(token: string) {
+  return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { global: { headers: { Authorization: `Bearer ${token}` } } }
   );
-  const { data: { user } } = await supabase.auth.getUser();
-  return user;
 }
 
 function getAIClient() {
@@ -46,17 +42,12 @@ function parsePDF(buffer: Buffer): Promise<string> {
   });
 }
 
-async function extractText(file: File): Promise<string> {
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const name = file.name.toLowerCase();
+async function extractText(buffer: Buffer, fileName: string): Promise<string> {
+  const name = fileName.toLowerCase();
 
-  if (name.endsWith(".txt")) {
-    return buffer.toString("utf-8");
-  }
+  if (name.endsWith(".txt")) return buffer.toString("utf-8");
 
-  if (name.endsWith(".pdf")) {
-    return await parsePDF(buffer);
-  }
+  if (name.endsWith(".pdf")) return parsePDF(buffer);
 
   if (name.endsWith(".docx")) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -70,16 +61,47 @@ async function extractText(file: File): Promise<string> {
 
 export async function POST(req: NextRequest) {
   try {
-    const user = await getUser(req);
+    const token = req.headers.get("authorization")?.replace("Bearer ", "");
+    if (!token) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+
+    const supabase = getSupabaseUser(token);
+    const { data: { user } } = await supabase.auth.getUser();
     if (!user) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
 
-    const formData = await req.formData();
-    const file = formData.get("file") as File | null;
-    if (!file) return NextResponse.json({ detail: "No file provided" }, { status: 400 });
+    // ── Accept either storage path (large files) or raw FormData (small files) ──
+    let buffer: Buffer;
+    let fileName: string;
 
+    const contentType = req.headers.get("content-type") ?? "";
+
+    if (contentType.includes("application/json")) {
+      // Large file path: file was uploaded directly to Supabase Storage by the browser
+      const { storageKey, fileName: fn } = await req.json();
+      if (!storageKey) return NextResponse.json({ detail: "No storageKey provided" }, { status: 400 });
+      fileName = fn ?? storageKey.split("/").pop() ?? "file";
+
+      const { data, error } = await supabase.storage.from("uploads").download(storageKey);
+      if (error || !data) {
+        return NextResponse.json({ detail: `Could not fetch file from storage: ${error?.message}` }, { status: 400 });
+      }
+      buffer = Buffer.from(await data.arrayBuffer());
+
+      // Clean up temp file (best-effort, non-blocking)
+      supabase.storage.from("uploads").remove([storageKey]).then(() => {});
+
+    } else {
+      // Small file path: FormData (kept for backward-compat, works for files < 4.5 MB)
+      const formData = await req.formData();
+      const file = formData.get("file") as File | null;
+      if (!file) return NextResponse.json({ detail: "No file provided" }, { status: 400 });
+      fileName = file.name;
+      buffer = Buffer.from(await file.arrayBuffer());
+    }
+
+    // ── Extract text ──
     let rawText: string;
     try {
-      rawText = await extractText(file);
+      rawText = await extractText(buffer, fileName);
     } catch (e: any) {
       console.error("[Extract] File parse error:", e?.message);
       return NextResponse.json({ detail: `Could not read file: ${e?.message}` }, { status: 400 });
