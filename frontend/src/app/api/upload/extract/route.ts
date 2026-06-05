@@ -20,26 +20,74 @@ function getAIClient() {
   return { client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), model: "gpt-4o-mini" };
 }
 
-function parsePDF(buffer: Buffer): Promise<string> {
-  return new Promise((resolve, reject) => {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const PDFParser = require("pdf2json");
-    const parser = new PDFParser();
-    parser.on("pdfParser_dataError", (err: any) => reject(new Error(err.parserError ?? "PDF parse error")));
-    parser.on("pdfParser_dataReady", (data: any) => {
-      try {
-        const text = data.Pages?.map((page: any) =>
-          page.Texts?.map((t: any) =>
-            t.R?.map((r: any) => decodeURIComponent(r.T ?? "")).join("") ?? ""
-          ).join(" ") ?? ""
-        ).join("\n") ?? "";
-        resolve(text);
-      } catch {
-        reject(new Error("Failed to extract text from PDF"));
-      }
-    });
-    parser.parseBuffer(buffer);
+// pdf2json extraction — fixes decodeURIComponent crash on special chars
+function parsePDFWithPdf2json(buffer: Buffer): Promise<string> {
+  return new Promise((resolve) => {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const PDFParser = require("pdf2json");
+      const parser = new PDFParser();
+      parser.on("pdfParser_dataError", () => resolve(""));
+      parser.on("pdfParser_dataReady", (data: any) => {
+        try {
+          const text = (data.Pages ?? []).map((page: any) =>
+            (page.Texts ?? []).map((t: any) =>
+              (t.R ?? []).map((r: any) => {
+                try { return decodeURIComponent(r.T ?? ""); }
+                catch { return r.T ?? ""; }          // don't crash on invalid %-sequences
+              }).join("")
+            ).join(" ")
+          ).join("\n");
+          resolve(text);
+        } catch {
+          resolve("");
+        }
+      });
+      parser.parseBuffer(buffer);
+    } catch {
+      resolve("");
+    }
   });
+}
+
+// pdfjs-dist fallback — handles more PDF encodings/fonts than pdf2json
+async function parsePDFWithPdfjs(buffer: Buffer): Promise<string> {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const pdfjsLib = require("pdfjs-dist/legacy/build/pdf.js");
+    pdfjsLib.GlobalWorkerOptions.workerSrc = "";   // no worker needed server-side
+
+    const pdf = await pdfjsLib.getDocument({
+      data: new Uint8Array(buffer),
+      useWorkerFetch: false,
+      isEvalSupported: false,
+      useSystemFonts: true,
+    }).promise;
+
+    const pages: string[] = [];
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page   = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map((item: any) => item.str ?? "").join(" "));
+    }
+    return pages.join("\n");
+  } catch {
+    return "";
+  }
+}
+
+async function extractPDFText(buffer: Buffer): Promise<{ text: string; pageCount: number }> {
+  // Try pdf2json first (faster)
+  const text1 = await parsePDFWithPdf2json(buffer);
+  if (text1.trim().length >= 50) return { text: text1, pageCount: 0 };
+
+  // Fallback: pdfjs-dist (better with complex fonts/encodings)
+  const text2 = await parsePDFWithPdfjs(buffer);
+
+  // Detect approximate page count from buffer to give a better error
+  const pageCount = (buffer.toString("binary").match(/\/Type\s*\/Page\b/g) ?? []).length;
+
+  return { text: text2, pageCount };
 }
 
 async function extractText(buffer: Buffer, fileName: string): Promise<string> {
@@ -47,7 +95,16 @@ async function extractText(buffer: Buffer, fileName: string): Promise<string> {
 
   if (name.endsWith(".txt")) return buffer.toString("utf-8");
 
-  if (name.endsWith(".pdf")) return parsePDF(buffer);
+  if (name.endsWith(".pdf")) {
+    const { text, pageCount } = await extractPDFText(buffer);
+    if (text.trim().length < 50) {
+      const hint = pageCount > 0
+        ? `This appears to be a scanned PDF (${pageCount} page${pageCount !== 1 ? "s" : ""} detected but no text layer). Please export it as a text-based PDF or copy-paste the content into a .txt file.`
+        : "Could not extract text. The PDF may be scanned, image-only, or password-protected. Try saving it as a text-based PDF or .txt file.";
+      throw new Error(hint);
+    }
+    return text;
+  }
 
   if (name.endsWith(".docx")) {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -108,10 +165,6 @@ export async function POST(req: NextRequest) {
     }
 
     const trimmed = rawText.trim();
-    if (trimmed.length < 50) {
-      return NextResponse.json({ detail: "Could not extract enough text from this file." }, { status: 400 });
-    }
-
     const truncated = trimmed.slice(0, 12000);
     const { client, model } = getAIClient();
 
