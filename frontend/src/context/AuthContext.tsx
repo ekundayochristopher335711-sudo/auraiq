@@ -10,6 +10,7 @@ interface User {
   full_name: string;
   plan: string;
   study_streak: number;
+  avatar_url: string | null;
 }
 
 interface AuthContextValue {

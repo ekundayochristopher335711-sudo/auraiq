@@ -1,5 +1,5 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { User, Shield, LogOut, Zap, Flame, Camera, Loader2, X, CheckCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -66,10 +66,16 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
 export default function SettingsPage() {
   const { user, logout } = useAuth();
   const [showUpgrade, setShowUpgrade] = useState(false);
-  const [avatarUrl, setAvatarUrl]     = useState<string | null>(null);
+  // Seed from user.avatar_url so it persists across refreshes
+  const [avatarUrl, setAvatarUrl]     = useState<string | null>(user?.avatar_url ?? null);
   const [uploading, setUploading]     = useState(false);
   const [avatarError, setAvatarError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Re-sync if the user object loads after first render (auth is async)
+  useEffect(() => {
+    if (user?.avatar_url && !avatarUrl) setAvatarUrl(user.avatar_url);
+  }, [user?.avatar_url]);
 
   const plan   = (user?.plan ?? "free") as keyof typeof PLAN_CONFIG;
   const badge  = PLAN_CONFIG[plan] ?? PLAN_CONFIG.free;

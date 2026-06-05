@@ -41,6 +41,7 @@ export const api = {
         full_name: profile.full_name ?? "",
         plan: profile.plan ?? "free",
         study_streak: profile.study_streak ?? 0,
+        avatar_url: (profile.avatar_url as string | null) ?? null,
       };
     },
     register: async () => {},
@@ -98,9 +99,18 @@ export const api = {
       const storagePath = `${session.user.id}/${Date.now()}_${file.name}`;
       const { error: storageError } = await supabase.storage
         .from("uploads")
-        .upload(storagePath, file, { upsert: true });
+        .upload(storagePath, file, { upsert: true, cacheControl: "3600" });
 
-      if (storageError) throw new Error(`Storage upload failed: ${storageError.message}`);
+      if (storageError) {
+        const msg = storageError.message ?? String(storageError);
+        if (msg.includes("not found") || msg.includes("Bucket")) {
+          throw new Error('Storage bucket "uploads" not found. Create it in Supabase → Storage.');
+        }
+        if (msg.includes("row-level security") || msg.includes("policy")) {
+          throw new Error("Storage permission denied. Add INSERT policy to the uploads bucket in Supabase SQL editor.");
+        }
+        throw new Error(`File upload failed: ${msg}`);
+      }
 
       let result: { preview: ExtractedContent; char_count: number };
       try {
