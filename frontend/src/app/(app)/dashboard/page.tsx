@@ -280,7 +280,12 @@ export default function DashboardPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <WeaknessHeatmap topics={topic_scores as any} />
               <div className="space-y-4">
-                <ScheduledActions />
+                <ScheduledActions
+                  cardsDue={stats.cards_due_today}
+                  streak={stats.study_streak}
+                  subjects={subjects}
+                  lastSessionDate={performance_trend[performance_trend.length - 1]?.date ?? null}
+                />
               </div>
             </div>
           </div>
