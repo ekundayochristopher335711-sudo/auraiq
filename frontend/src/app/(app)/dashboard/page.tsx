@@ -85,7 +85,7 @@ export default function DashboardPage() {
 
       {/* Empty state for new users */}
       {isNewUser && (
-        <div className="rounded-2xl bg-[#141414] border border-violet-500/20 p-8 text-center">
+        <div className="rounded-2xl bg-[#141414] border border-violet-500/20 p-5 sm:p-8 text-center">
           <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <Upload size={28} className="text-violet-400" />
           </div>
@@ -98,16 +98,18 @@ export default function DashboardPage() {
               <BookOpen size={15} /> Create your first subject <ArrowRight size={14} />
             </Link>
           </div>
-          <div className="grid grid-cols-3 gap-4 mt-8 text-left">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-6 text-left">
             {[
               { n: "1", title: "Create a subject", desc: "Name your study topic or exam" },
               { n: "2", title: "Upload a document", desc: "PDF, DOCX, or TXT — up to 30MB" },
               { n: "3", title: "Start reviewing",   desc: "AI flashcards generated instantly" },
             ].map(({ n, title, desc }) => (
-              <div key={n} className="bg-white/3 rounded-xl p-4">
-                <div className="w-6 h-6 rounded-full bg-violet-500/20 text-violet-400 text-xs font-bold flex items-center justify-center mb-2">{n}</div>
-                <p className="text-sm font-medium text-white mb-1">{title}</p>
-                <p className="text-xs text-gray-500">{desc}</p>
+              <div key={n} className="bg-white/3 rounded-xl p-4 flex sm:block items-center gap-3">
+                <div className="w-7 h-7 rounded-full bg-violet-500/20 text-violet-400 text-xs font-bold flex items-center justify-center shrink-0 sm:mb-2">{n}</div>
+                <div>
+                  <p className="text-sm font-medium text-white sm:mb-1">{title}</p>
+                  <p className="text-xs text-gray-500">{desc}</p>
+                </div>
               </div>
             ))}
           </div>
