@@ -1,6 +1,7 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
 import { Brain, Send, ChevronDown, Sparkles, BookOpen, ImagePlus, X } from "lucide-react";
+import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
 import type { Subject } from "@/lib/api";
@@ -36,15 +37,33 @@ function MessageBubble({ msg }: { msg: Message }) {
         </div>
       )}
       <div className={cn(
-        "max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed whitespace-pre-wrap",
+        "max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed",
         isUser
-          ? "bg-violet-600 text-white rounded-tr-sm"
+          ? "bg-violet-600 text-white rounded-tr-sm whitespace-pre-wrap"
           : "bg-[#1a1a1a] text-gray-200 rounded-tl-sm border border-white/8"
       )}>
         {msg.imageUrl && (
           <img src={msg.imageUrl} alt="uploaded" className="rounded-xl max-w-60 mb-2 block" />
         )}
-        {msg.content}
+        {isUser ? msg.content : (
+          <ReactMarkdown
+            components={{
+              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+              ul: ({ children }) => <ul className="list-disc list-outside ml-4 mb-2 space-y-1">{children}</ul>,
+              ol: ({ children }) => <ol className="list-decimal list-outside ml-4 mb-2 space-y-1">{children}</ol>,
+              li: ({ children }) => <li className="leading-relaxed">{children}</li>,
+              strong: ({ children }) => <strong className="text-violet-300 font-semibold">{children}</strong>,
+              em: ({ children }) => <em className="text-gray-300 italic">{children}</em>,
+              code: ({ children }) => <code className="bg-black/40 text-violet-200 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>,
+              h1: ({ children }) => <h1 className="text-base font-bold text-white mb-1 mt-2">{children}</h1>,
+              h2: ({ children }) => <h2 className="text-sm font-bold text-white mb-1 mt-2">{children}</h2>,
+              h3: ({ children }) => <h3 className="text-sm font-semibold text-gray-200 mb-1 mt-1">{children}</h3>,
+              blockquote: ({ children }) => <blockquote className="border-l-2 border-violet-500/50 pl-3 text-gray-400 italic">{children}</blockquote>,
+            }}
+          >
+            {msg.content}
+          </ReactMarkdown>
+        )}
       </div>
     </div>
   );
