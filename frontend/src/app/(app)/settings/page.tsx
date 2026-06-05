@@ -107,7 +107,12 @@ export default function SettingsPage() {
       const { data: urlData } = supabase.storage.from("avatars").getPublicUrl(path);
       const publicUrl = urlData.publicUrl + `?t=${Date.now()}`;
 
-      await supabase.from("profiles").update({ avatar_url: publicUrl }).eq("id", authUser.id);
+      const { error: dbError } = await supabase
+        .from("profiles")
+        .update({ avatar_url: publicUrl } as any)
+        .eq("id", authUser.id);
+      if (dbError) throw new Error(`Could not save avatar: ${dbError.message}`);
+
       setAvatarUrl(publicUrl);
     } catch (err: any) {
       setAvatarError(err.message ?? "Upload failed. Please try again.");
