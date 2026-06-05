@@ -11,7 +11,7 @@ import { ScheduledActions } from "@/components/dashboard/ScheduledActions";
 import { TopAssetsCard } from "@/components/dashboard/TopAssetsCard";
 import { StatCard } from "@/components/dashboard/StatCard";
 import { api, DashboardData, Subject } from "@/lib/api";
-
+import { supabase } from "@/lib/supabaseClient";
 
 type Tab = "Overview" | "Reports" | "History" | "Activity";
 
@@ -32,6 +32,18 @@ export default function DashboardPage() {
         .then((s) => { setSubjects(s); setRealSubjects(s); })
         .catch(() => { setRealSubjects([]); }),
     ]).finally(() => setLoading(false));
+
+    // Live card count via Supabase realtime
+    const channel = supabase
+      .channel("dashboard-flashcards")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "flashcards" },
+        () => { api.dashboard.get().then(setData).catch(() => {}); }
+      )
+      .subscribe();
+
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   useEffect(() => {

@@ -6,6 +6,7 @@ import { ArrowLeft, Zap, Brain, Upload, Plus, Loader2, Trash2, ChevronDown, Chev
 import { api, Subject, ExtractedContent } from "@/lib/api";
 import { DropZone } from "@/components/upload/DropZone";
 import { ExtractionPreview } from "@/components/upload/ExtractionPreview";
+import { useToast } from "@/context/ToastContext";
 import { cn } from "@/lib/utils";
 
 type UploadStep = "idle" | "uploading" | "preview" | "saving";
@@ -18,15 +19,24 @@ interface SubjectFlashcard {
   created_at?: string;
 }
 
-function FlashcardRow({ card, onDelete }: { card: SubjectFlashcard; onDelete: (id: number) => void }) {
+function FlashcardRow({
+  card,
+  onDelete,
+}: {
+  card: SubjectFlashcard;
+  onDelete: (id: number) => Promise<void>;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
-  const diffColor = card.difficulty === "easy" ? "text-emerald-400 bg-emerald-500/10" :
-    card.difficulty === "hard" ? "text-red-400 bg-red-500/10" : "text-amber-400 bg-amber-500/10";
+  const diffColor =
+    card.difficulty === "easy"
+      ? "text-emerald-400 bg-emerald-500/10"
+      : card.difficulty === "hard"
+      ? "text-red-400 bg-red-500/10"
+      : "text-amber-400 bg-amber-500/10";
 
   const handleDelete = async () => {
-    if (!confirm("Delete this flashcard?")) return;
     setDeleting(true);
     try { await onDelete(card.id); } finally { setDeleting(false); }
   };
@@ -69,6 +79,7 @@ function SubjectDetailContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const openUpload = searchParams.get("upload") === "1";
+  const { toast, confirm } = useToast();
 
   const [subject, setSubject] = useState<Subject | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,6 +91,7 @@ function SubjectDetailContent() {
   const [deleting, setDeleting] = useState(false);
 
   const [flashcards, setFlashcards] = useState<SubjectFlashcard[]>([]);
+  const [flashcardsLoaded, setFlashcardsLoaded] = useState(false);
   const [flashcardsLoading, setFlashcardsLoading] = useState(false);
   const [showFlashcards, setShowFlashcards] = useState(false);
 
@@ -91,6 +103,14 @@ function SubjectDetailContent() {
       })
       .catch(() => {})
       .finally(() => setLoading(false));
+
+    // auto-load flashcards silently so count is available
+    api.subjects.getFlashcards(Number(id))
+      .then((data) => {
+        setFlashcards(data as SubjectFlashcard[]);
+        setFlashcardsLoaded(true);
+      })
+      .catch(() => { setFlashcardsLoaded(true); });
   }, [id]);
 
   const loadFlashcards = async () => {
@@ -98,19 +118,28 @@ function SubjectDetailContent() {
     try {
       const data = await api.subjects.getFlashcards(Number(id));
       setFlashcards(data as SubjectFlashcard[]);
+      setFlashcardsLoaded(true);
     } catch { /* ignore */ } finally {
       setFlashcardsLoading(false);
     }
   };
 
   const toggleFlashcards = () => {
-    if (!showFlashcards && flashcards.length === 0) loadFlashcards();
+    if (!showFlashcards && !flashcardsLoaded) loadFlashcards();
     setShowFlashcards((v) => !v);
   };
 
   const handleFlashcardDelete = async (cardId: number) => {
+    const card = flashcards.find((c) => c.id === cardId);
+    const ok = await confirm("This flashcard will be permanently removed.", {
+      title: "Delete flashcard?",
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!ok) return;
     await api.flashcards.delete(cardId);
     setFlashcards((prev) => prev.filter((c) => c.id !== cardId));
+    toast.success("Flashcard deleted.");
   };
 
   const handleFile = async (file: File) => {
@@ -137,23 +166,31 @@ function SubjectDetailContent() {
       const list = await api.subjects.list();
       const updated = list.find((s) => s.id === Number(id));
       if (updated) setSubject(updated);
-      // refresh flashcards if visible
-      if (showFlashcards) loadFlashcards();
+      // refresh flashcards
+      const fresh = await api.subjects.getFlashcards(Number(id));
+      setFlashcards(fresh as SubjectFlashcard[]);
+      toast.success("Flashcards saved!");
     } catch (err: any) {
       setUploadError(err.message ?? "Save failed.");
+      toast.error(err.message ?? "Save failed.");
     } finally {
       setSavingPreview(false);
     }
   };
 
   const handleDeleteSubject = async () => {
-    if (!confirm(`Delete "${subject?.title}" and all its flashcards? This cannot be undone.`)) return;
+    const ok = await confirm(
+      `"${subject?.title}" and all its flashcards will be permanently deleted.`,
+      { title: "Delete subject?", confirmLabel: "Delete", danger: true }
+    );
+    if (!ok) return;
     setDeleting(true);
     try {
       await api.subjects.delete(Number(id));
+      toast.success("Subject deleted.");
       router.push("/subjects");
     } catch (err: any) {
-      alert(err.message ?? "Delete failed");
+      toast.error(err.message ?? "Delete failed.");
       setDeleting(false);
     }
   };
@@ -229,7 +266,9 @@ function SubjectDetailContent() {
           >
             <Zap size={12} /> Start Review Session
           </Link>
-          <p className="text-xs text-gray-600">Upload a document to add flashcards</p>
+          <p className="text-xs text-gray-600">
+            {flashcardsLoaded ? `${flashcards.length} flashcard${flashcards.length !== 1 ? "s" : ""}` : "Loading..."}
+          </p>
         </div>
       </div>
 
@@ -244,9 +283,7 @@ function SubjectDetailContent() {
             <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{uploadError}</p>
           )}
 
-          {uploadStep === "idle" && (
-            <DropZone onFile={handleFile} />
-          )}
+          {uploadStep === "idle" && <DropZone onFile={handleFile} />}
 
           {uploadStep === "uploading" && (
             <div className="flex flex-col items-center py-10 gap-3">
@@ -275,8 +312,10 @@ function SubjectDetailContent() {
           <div className="flex items-center gap-2">
             <Brain size={16} className="text-violet-400" />
             <span className="text-sm font-semibold text-white">Flashcards</span>
-            {flashcards.length > 0 && (
-              <span className="text-xs text-gray-500 bg-white/5 rounded-full px-2 py-0.5">{flashcards.length}</span>
+            {flashcardsLoaded && (
+              <span className="text-xs text-gray-500 bg-white/5 rounded-full px-2 py-0.5">
+                {flashcards.length}
+              </span>
             )}
           </div>
           {showFlashcards ? <ChevronUp size={15} className="text-gray-500" /> : <ChevronDown size={15} className="text-gray-500" />}

@@ -1,11 +1,15 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
-import { api } from "@/lib/api";
-import { Timer, Flag, ChevronLeft, ChevronRight, Play, CheckCircle, XCircle, BookOpen } from "lucide-react";
+import { api, Subject } from "@/lib/api";
+import { supabase } from "@/lib/supabaseClient";
+import { useToast } from "@/context/ToastContext";
+import { Timer, Flag, ChevronLeft, ChevronRight, Play, CheckCircle, XCircle, BookOpen, Loader2, Brain, Sparkles } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Phase = "setup" | "exam" | "results";
+type ExamMode = "pmp" | "ai";
+type Difficulty = "easy" | "medium" | "hard";
 
 interface Question {
   id: number;
@@ -132,21 +136,35 @@ const MOCK_QUESTIONS: Question[] = [
 
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function ExamSimPage() {
-  const [phase, setPhase]       = useState<Phase>("setup");
-  const [qCount, setQCount]     = useState<10 | 25 | 50>(10);
-  const [timed, setTimed]       = useState(true);
-  const [timeMins, setTimeMins] = useState(30);
+  const { toast } = useToast();
+  const [phase, setPhase]         = useState<Phase>("setup");
+  const [examMode, setExamMode]   = useState<ExamMode>("pmp");
+  const [qCount, setQCount]       = useState<10 | 25 | 50>(10);
+  const [timed, setTimed]         = useState(true);
+  const [timeMins, setTimeMins]   = useState(30);
+  const [difficulty, setDifficulty] = useState<Difficulty>("medium");
+  const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
+  const [generating, setGenerating] = useState(false);
+  const [aiError, setAiError]     = useState("");
+
   const [questions, setQuestions] = useState<Question[]>([]);
-  const [answers, setAnswers]   = useState<Record<number, number>>({});
-  const [flagged, setFlagged]   = useState<Set<number>>(new Set());
-  const [current, setCurrent]   = useState(0);
-  const [timeLeft, setTimeLeft] = useState(0);
+  const [answers, setAnswers]     = useState<Record<number, number>>({});
+  const [flagged, setFlagged]     = useState<Set<number>>(new Set());
+  const [current, setCurrent]     = useState(0);
+  const [timeLeft, setTimeLeft]   = useState(0);
   const [showReview, setShowReview] = useState(false);
-  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subjects, setSubjects]   = useState<Subject[]>([]);
   const [loadingSubjects, setLoadingSubjects] = useState(true);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Start/stop countdown
+  useEffect(() => {
+    api.subjects.list()
+      .then((list) => { setSubjects(list); if (list.length > 0) setSelectedSubject(list[0]); })
+      .catch(() => setSubjects([]))
+      .finally(() => setLoadingSubjects(false));
+  }, []);
+
+  // Countdown
   useEffect(() => {
     if (phase !== "exam" || !timed) return;
     timerRef.current = setInterval(() => {
@@ -158,22 +176,13 @@ export default function ExamSimPage() {
     return () => { if (timerRef.current) clearInterval(timerRef.current); };
   }, [phase, timed]);
 
-  // Auto-submit when time runs out
   useEffect(() => {
     if (phase === "exam" && timed && timeLeft === 0 && questions.length > 0) {
       setPhase("results");
     }
   }, [timeLeft, phase, timed, questions.length]);
 
-  useEffect(() => {
-    api.subjects.list()
-      .then((list) => setSubjects(list.map((subject) => subject.title)))
-      .catch(() => setSubjects([]))
-      .finally(() => setLoadingSubjects(false));
-  }, []);
-
-  const startExam = () => {
-    const qs = MOCK_QUESTIONS.slice(0, Math.min(qCount, MOCK_QUESTIONS.length));
+  const launchExam = (qs: Question[]) => {
     setQuestions(qs);
     setAnswers({});
     setFlagged(new Set());
@@ -181,6 +190,59 @@ export default function ExamSimPage() {
     setTimeLeft(timeMins * 60);
     setShowReview(false);
     setPhase("exam");
+  };
+
+  const startPmpExam = () => {
+    const qs = MOCK_QUESTIONS.slice(0, Math.min(qCount, MOCK_QUESTIONS.length));
+    launchExam(qs);
+  };
+
+  const startAIExam = async () => {
+    if (!selectedSubject) return;
+    setGenerating(true);
+    setAiError("");
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      const count = Math.min(qCount, 20); // cap AI questions at 20
+
+      const res = await fetch("/api/ai/quiz", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ topic: selectedSubject.title, difficulty, count }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.detail ?? `Request failed (${res.status})`);
+      }
+
+      const raw: Array<{ question: string; options: string[]; answer: string; explanation: string }> = await res.json();
+
+      if (!Array.isArray(raw) || raw.length === 0) {
+        throw new Error("AI returned no questions. Try again.");
+      }
+
+      const qs: Question[] = raw.map((item, idx) => ({
+        id: idx + 1,
+        topic: selectedSubject.title,
+        question: item.question,
+        // Strip "A. " prefix if present (AI sometimes includes it)
+        options: item.options.map((opt) => opt.replace(/^[A-D]\.\s*/, "")),
+        correct: item.answer.charCodeAt(0) - 65,
+        explanation: item.explanation,
+      }));
+
+      toast.success(`${qs.length} questions generated for "${selectedSubject.title}"`);
+      launchExam(qs);
+    } catch (err: any) {
+      setAiError(err.message ?? "Failed to generate questions.");
+    } finally {
+      setGenerating(false);
+    }
   };
 
   const submitExam = () => {
@@ -212,35 +274,106 @@ export default function ExamSimPage() {
 
   // ── Setup ──────────────────────────────────────────────────────────────────
   if (phase === "setup") {
-    if (!loadingSubjects && subjects.length === 0) {
-      return (
-        <div className="p-6 max-w-2xl">
-          <div className="mb-6">
-            <h1 className="text-xl font-bold text-white">Exam Simulator</h1>
-            <p className="text-sm text-gray-500 mt-0.5">Practice under real exam conditions</p>
-          </div>
-          <div className="rounded-2xl bg-[#141414] border border-white/8 p-8 text-center">
-            <p className="text-lg font-semibold text-white mb-3">Add your first subject</p>
-            <p className="text-sm text-gray-400 mb-6">
-              Create a subject and upload study material to unlock personalized exam practice.
-            </p>
-            <Link href="/subjects" className="inline-flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl px-5 py-3 transition-colors">
-              <BookOpen size={16} /> Create a subject
-            </Link>
-          </div>
-        </div>
-      );
-    }
-
-    const available = Math.min(qCount, MOCK_QUESTIONS.length);
     return (
-      <div className="p-6 max-w-2xl">
-        <div className="mb-6">
+      <div className="p-4 sm:p-6 max-w-2xl space-y-4">
+        <div>
           <h1 className="text-xl font-bold text-white">Exam Simulator</h1>
           <p className="text-sm text-gray-500 mt-0.5">Practice under real exam conditions</p>
         </div>
 
-        <div className="rounded-2xl bg-[#141414] border border-white/8 p-6 space-y-6">
+        {/* Mode selector */}
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            onClick={() => setExamMode("pmp")}
+            className={cn(
+              "rounded-2xl border p-4 text-left transition-all",
+              examMode === "pmp"
+                ? "bg-violet-600/10 border-violet-500/40"
+                : "bg-[#141414] border-white/8 hover:border-white/15"
+            )}
+          >
+            <BookOpen size={18} className={examMode === "pmp" ? "text-violet-400" : "text-gray-500"} />
+            <p className={cn("text-sm font-semibold mt-2", examMode === "pmp" ? "text-violet-300" : "text-gray-300")}>PMP Practice</p>
+            <p className="text-xs text-gray-500 mt-0.5">Curated question bank</p>
+          </button>
+
+          <button
+            onClick={() => setExamMode("ai")}
+            className={cn(
+              "rounded-2xl border p-4 text-left transition-all",
+              examMode === "ai"
+                ? "bg-violet-600/10 border-violet-500/40"
+                : "bg-[#141414] border-white/8 hover:border-white/15"
+            )}
+          >
+            <Sparkles size={18} className={examMode === "ai" ? "text-violet-400" : "text-gray-500"} />
+            <p className={cn("text-sm font-semibold mt-2", examMode === "ai" ? "text-violet-300" : "text-gray-300")}>Your Subjects</p>
+            <p className="text-xs text-gray-500 mt-0.5">AI-generated from your notes</p>
+          </button>
+        </div>
+
+        <div className="rounded-2xl bg-[#141414] border border-white/8 p-5 space-y-5">
+          {/* Subject picker (AI mode only) */}
+          {examMode === "ai" && (
+            <div>
+              <p className="text-sm font-medium text-gray-300 mb-3">Select Subject</p>
+              {loadingSubjects ? (
+                <div className="flex items-center gap-2 text-sm text-gray-500">
+                  <Loader2 size={14} className="animate-spin" /> Loading subjects...
+                </div>
+              ) : subjects.length === 0 ? (
+                <div className="rounded-xl bg-amber-500/5 border border-amber-500/20 p-4 text-center">
+                  <p className="text-sm text-amber-400 mb-2">No subjects yet</p>
+                  <Link href="/subjects" className="text-xs text-violet-400 hover:text-violet-300 underline">
+                    Create a subject first →
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2 max-h-44 overflow-y-auto pr-1">
+                  {subjects.map((s) => (
+                    <button
+                      key={s.id}
+                      onClick={() => setSelectedSubject(s)}
+                      className={cn(
+                        "w-full text-left flex items-center gap-2 rounded-xl border px-3 py-2.5 transition-all",
+                        selectedSubject?.id === s.id
+                          ? "bg-violet-600/15 border-violet-500/40 text-violet-300"
+                          : "bg-white/3 border-white/8 text-gray-400 hover:border-white/15"
+                      )}
+                    >
+                      <Brain size={13} className="shrink-0" />
+                      <span className="text-sm truncate">{s.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Difficulty (AI mode only) */}
+          {examMode === "ai" && (
+            <div>
+              <p className="text-sm font-medium text-gray-300 mb-3">Difficulty</p>
+              <div className="flex gap-2">
+                {(["easy", "medium", "hard"] as Difficulty[]).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDifficulty(d)}
+                    className={cn(
+                      "flex-1 py-2.5 rounded-xl text-sm font-medium border capitalize transition-colors",
+                      difficulty === d
+                        ? "bg-violet-600/20 border-violet-500/40 text-violet-300"
+                        : "bg-white/3 border-white/8 text-gray-400 hover:text-gray-200 hover:border-white/15"
+                    )}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Question count */}
           <div>
             <p className="text-sm font-medium text-gray-300 mb-3">Number of Questions</p>
             <div className="flex gap-2">
@@ -255,19 +388,20 @@ export default function ExamSimPage() {
                       : "bg-white/3 border-white/8 text-gray-400 hover:text-gray-200 hover:border-white/15"
                   )}
                 >
-                  {n}
+                  {n}{examMode === "ai" && n > 20 ? "*" : ""}
                 </button>
               ))}
             </div>
+            {examMode === "ai" && qCount > 20 && (
+              <p className="text-xs text-gray-600 mt-1.5">* AI mode is capped at 20 questions</p>
+            )}
           </div>
 
+          {/* Timed toggle */}
           <div>
             <p className="text-sm font-medium text-gray-300 mb-3">Mode</p>
             <div className="flex gap-2">
-              {[
-                { label: "Timed",     value: true },
-                { label: "Untimed",   value: false },
-              ].map(({ label, value }) => (
+              {[{ label: "Timed", value: true }, { label: "Untimed", value: false }].map(({ label, value }) => (
                 <button
                   key={label}
                   onClick={() => setTimed(value)}
@@ -284,6 +418,7 @@ export default function ExamSimPage() {
             </div>
           </div>
 
+          {/* Time limit */}
           {timed && (
             <div>
               <p className="text-sm font-medium text-gray-300 mb-3">Time Limit</p>
@@ -306,17 +441,38 @@ export default function ExamSimPage() {
             </div>
           )}
 
+          {/* Summary */}
           <div className="rounded-xl bg-violet-500/5 border border-violet-500/15 p-4 text-sm text-gray-400 space-y-1.5">
-            <p>📋 <span className="text-gray-300 font-medium">{available} questions</span> from the PMP question bank</p>
+            {examMode === "ai" ? (
+              <>
+                <p><Sparkles size={12} className="inline mr-1.5 text-violet-400" />
+                  <span className="text-gray-300 font-medium">{Math.min(qCount, 20)} questions</span> generated by AI from "{selectedSubject?.title ?? "..."}"
+                </p>
+                <p>🎯 Difficulty: <span className="text-gray-300 capitalize">{difficulty}</span></p>
+              </>
+            ) : (
+              <p>📋 <span className="text-gray-300 font-medium">{Math.min(qCount, MOCK_QUESTIONS.length)} questions</span> from the PMP question bank</p>
+            )}
             <p>⏱ {timed ? `${timeMins}-minute time limit` : "No time limit — focus on understanding"}</p>
             <p>🎯 Passing score: <span className="text-gray-300">70% or above</span></p>
           </div>
 
+          {/* Error */}
+          {aiError && (
+            <p className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{aiError}</p>
+          )}
+
+          {/* Start */}
           <button
-            onClick={startExam}
-            className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 text-white font-semibold rounded-xl py-3 transition-colors"
+            onClick={examMode === "ai" ? startAIExam : startPmpExam}
+            disabled={generating || (examMode === "ai" && (!selectedSubject || subjects.length === 0))}
+            className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-3 transition-colors"
           >
-            <Play size={16} /> Start Exam
+            {generating ? (
+              <><Loader2 size={16} className="animate-spin" /> Generating questions...</>
+            ) : (
+              <><Play size={16} /> Start Exam</>
+            )}
           </button>
         </div>
       </div>
@@ -326,13 +482,12 @@ export default function ExamSimPage() {
   // ── Results ────────────────────────────────────────────────────────────────
   if (phase === "results") {
     return (
-      <div className="p-6 max-w-3xl">
+      <div className="p-4 sm:p-6 max-w-3xl">
         <div className="mb-6">
           <h1 className="text-xl font-bold text-white">Exam Results</h1>
           <p className="text-sm text-gray-500 mt-0.5">Review your performance</p>
         </div>
 
-        {/* Score banner */}
         <div className={cn(
           "rounded-2xl border p-6 mb-4 flex items-center gap-6",
           passed ? "bg-emerald-500/5 border-emerald-500/20" : "bg-red-500/5 border-red-500/20"
@@ -365,7 +520,6 @@ export default function ExamSimPage() {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-4">
           {[
             { label: "Correct",   value: score,         color: "text-emerald-400" },
@@ -379,7 +533,6 @@ export default function ExamSimPage() {
           ))}
         </div>
 
-        {/* Domain breakdown */}
         <div className="rounded-2xl bg-[#141414] border border-white/8 p-5 mb-4">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-4">Domain Breakdown</p>
           <div className="space-y-3">
@@ -402,7 +555,6 @@ export default function ExamSimPage() {
           </div>
         </div>
 
-        {/* Question review accordion */}
         <div className="rounded-2xl bg-[#141414] border border-white/8 overflow-hidden mb-4">
           <button
             onClick={() => setShowReview((v) => !v)}
@@ -452,7 +604,6 @@ export default function ExamSimPage() {
           )}
         </div>
 
-        {/* Actions */}
         <div className="flex gap-3">
           <button
             onClick={() => setPhase("setup")}
@@ -461,10 +612,11 @@ export default function ExamSimPage() {
             New Exam
           </button>
           <button
-            onClick={startExam}
-            className="flex-1 bg-violet-600 hover:bg-violet-500 text-white rounded-xl py-3 text-sm font-semibold transition-colors"
+            onClick={examMode === "ai" ? startAIExam : startPmpExam}
+            disabled={generating}
+            className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl py-3 text-sm font-semibold transition-colors"
           >
-            Retake
+            {generating ? "Generating..." : "Retake"}
           </button>
         </div>
       </div>
@@ -478,7 +630,7 @@ export default function ExamSimPage() {
   return (
     <div className="flex flex-col h-screen overflow-hidden bg-[#0a0a0a]">
 
-      {/* ── Sticky top bar ── */}
+      {/* Sticky top bar */}
       <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-white/8 bg-[#0d0d0d] shrink-0">
         <div className="flex items-center gap-2">
           <button
@@ -487,7 +639,9 @@ export default function ExamSimPage() {
           >
             <ChevronLeft size={18} />
           </button>
-          <span className="text-sm font-medium text-gray-300 hidden sm:inline">PMP Practice Exam</span>
+          <span className="text-sm font-medium text-gray-300 hidden sm:inline">
+            {examMode === "ai" && selectedSubject ? selectedSubject.title : "PMP Practice Exam"}
+          </span>
         </div>
         <div className="flex items-center gap-3">
           {timed && (
@@ -508,11 +662,8 @@ export default function ExamSimPage() {
         </div>
       </div>
 
-      {/* ── Mobile question grid strip (visible only on small screens) ── */}
+      {/* Mobile question grid strip */}
       <div className="lg:hidden shrink-0 px-4 py-2.5 border-b border-white/8 bg-[#0d0d0d]">
-        <div className="flex items-center gap-1 mb-1.5">
-          <span className="text-[10px] font-medium text-gray-600 uppercase tracking-wider">Questions</span>
-        </div>
         <div className="flex gap-1 overflow-x-auto pb-0.5">
           {questions.map((_, i) => (
             <button
@@ -547,14 +698,11 @@ export default function ExamSimPage() {
         </div>
       </div>
 
-      {/* ── Main content (question + desktop sidebar) ── */}
+      {/* Main content */}
       <div className="flex flex-1 overflow-hidden">
-
-        {/* Question panel — full width on mobile */}
         <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="max-w-2xl mx-auto space-y-4">
 
-            {/* Topic + counter */}
             <div className="flex items-center justify-between">
               <span className="text-xs bg-violet-500/10 text-violet-400 px-2.5 py-1 rounded-full font-medium">
                 {q.topic}
@@ -562,12 +710,10 @@ export default function ExamSimPage() {
               <span className="text-xs text-gray-500">Question {current + 1} of {total}</span>
             </div>
 
-            {/* Question card */}
             <div className="rounded-2xl bg-[#141414] border border-white/8 p-4 sm:p-5">
               <p className="text-sm sm:text-base text-gray-100 leading-relaxed">{q.question}</p>
             </div>
 
-            {/* Answer options */}
             <div className="space-y-2.5">
               {q.options.map((opt, j) => {
                 const selected = answers[current] === j;
@@ -594,7 +740,6 @@ export default function ExamSimPage() {
               })}
             </div>
 
-            {/* Nav controls */}
             <div className="flex items-center justify-between pt-1 pb-4">
               <button
                 onClick={toggleFlag}
@@ -627,7 +772,7 @@ export default function ExamSimPage() {
           </div>
         </div>
 
-        {/* ── Desktop sidebar (hidden on mobile — strip above handles navigation) ── */}
+        {/* Desktop sidebar */}
         <div className="hidden lg:flex flex-col w-52 shrink-0 border-l border-white/8 bg-[#0d0d0d] p-4 overflow-y-auto">
           <p className="text-xs font-medium text-gray-500 uppercase tracking-wider mb-3">Questions</p>
           <div className="grid grid-cols-5 gap-1.5 mb-4">
@@ -664,7 +809,6 @@ export default function ExamSimPage() {
             ))}
           </div>
         </div>
-
       </div>
     </div>
   );

@@ -47,6 +47,9 @@ export async function POST(req: NextRequest) {
     if (!flashError) flashcards_created = flashcards.length;
   }
 
+  // Increment study streak (best-effort)
+  try { await supabase.rpc("increment_streak", { uid: user.id }); } catch { }
+
   return NextResponse.json({
     subject_id: subject.id,
     title: subject.title,
