@@ -212,7 +212,7 @@ export default function ExamSimPage() {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
         },
-        body: JSON.stringify({ topic: selectedSubject.title, difficulty, count }),
+        body: JSON.stringify({ topic: selectedSubject.title, difficulty, count, subjectId: selectedSubject.id }),
       });
 
       if (!res.ok) {

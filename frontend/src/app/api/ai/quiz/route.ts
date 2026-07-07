@@ -9,14 +9,14 @@ function getAIClient() {
   return { client: new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), model: "gpt-4o-mini" };
 }
 
-async function getUser(req: NextRequest) {
+async function getAuth(req: NextRequest) {
   const token = req.headers.get("authorization")?.replace("Bearer ", "");
-  if (!token) return null;
+  if (!token) return { user: null, supabase: null };
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!, {
     global: { headers: { Authorization: `Bearer ${token}` } },
   });
   const { data: { user } } = await supabase.auth.getUser();
-  return user;
+  return { user, supabase };
 }
 
 // Parse the AI's JSON, salvaging as many complete questions as possible if the
@@ -47,14 +47,37 @@ function parseQuestions(content: string): any[] {
 export const maxDuration = 60;
 
 export async function POST(req: NextRequest) {
-  const user = await getUser(req);
-  if (!user) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
+  const { user, supabase } = await getAuth(req);
+  if (!user || !supabase) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
 
-  const { topic, difficulty = "medium", count = 5 } = await req.json();
+  const { topic, difficulty = "medium", count = 5, subjectId } = await req.json();
   const { client, model } = getAIClient();
 
-  const prompt = `Generate ${count} multiple choice questions about "${topic}" at ${difficulty} difficulty for a certification exam.
-Return a JSON object with a "questions" array: {"questions": [{"question": "...", "options": ["A. ...", "B. ...", "C. ...", "D. ..."], "answer": "A", "explanation": "..."}]}
+  // Pull the student's OWN uploaded material (their flashcards for this subject)
+  // so the exam is built from what they uploaded, not generic topic knowledge.
+  let sourceNotes = "";
+  if (subjectId) {
+    const { data } = await supabase
+      .from("flashcards")
+      .select("question, answer")
+      .eq("subject_id", subjectId)
+      .limit(200);
+    if (data && data.length > 0) {
+      sourceNotes = data.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n").slice(0, 12000);
+    }
+  }
+
+  const jsonShape = `{"questions": [{"question": "...", "options": ["A. ...", "B. ...", "C. ...", "D. ..."], "answer": "A", "explanation": "..."}]}`;
+
+  const prompt = sourceNotes
+    ? `You are an exam writer. Using ONLY the student's study notes below, write ${count} multiple choice questions (4 options each) at ${difficulty} difficulty that test understanding of THIS material. Do not introduce facts that are not supported by the notes. Vary the questions — do not simply copy the notes verbatim.
+Study notes:
+${sourceNotes}
+
+Return a JSON object: ${jsonShape}
+Keep each explanation to 1-2 sentences. Return only valid JSON.`
+    : `Generate ${count} multiple choice questions about "${topic}" at ${difficulty} difficulty for a certification exam.
+Return a JSON object with a "questions" array: ${jsonShape}
 Keep each explanation to 1-2 sentences. Return only valid JSON.`;
 
   try {
