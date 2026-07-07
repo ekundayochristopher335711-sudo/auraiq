@@ -15,8 +15,11 @@ export async function POST(req: NextRequest) {
   const { client: supabase, user } = await getAuthenticatedClient(req);
   if (!supabase || !user) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
 
-  const { preview, subjectId } = await req.json();
+  const { preview, subjectId, content } = await req.json();
   if (!preview) return NextResponse.json({ detail: "No content provided" }, { status: 400 });
+
+  const MAX_CONTENT = 60000;   // cap accumulated source text per subject (~60 KB)
+  const incoming = typeof content === "string" ? content.trim() : "";
 
   let subject: { id: number; title: string };
 
@@ -24,16 +27,26 @@ export async function POST(req: NextRequest) {
     // Append to an existing subject (RLS ensures it belongs to this user)
     const { data, error } = await supabase
       .from("subjects")
-      .select("id, title")
+      .select("id, title, content")
       .eq("id", subjectId)
       .single();
     if (error || !data) return NextResponse.json({ detail: "Subject not found" }, { status: 404 });
     subject = data;
+
+    if (incoming) {
+      const merged = [(data as any).content ?? "", incoming].filter(Boolean).join("\n\n").slice(0, MAX_CONTENT);
+      await supabase.from("subjects").update({ content: merged }).eq("id", subjectId);
+    }
   } else {
     // Create a new subject from the extracted content
     const { data, error: subjectError } = await supabase
       .from("subjects")
-      .insert({ title: preview.subject_title, description: preview.subject_description, user_id: user.id })
+      .insert({
+        title: preview.subject_title,
+        description: preview.subject_description,
+        user_id: user.id,
+        content: incoming.slice(0, MAX_CONTENT) || null,
+      })
       .select()
       .single();
     if (subjectError || !data) return NextResponse.json({ detail: subjectError?.message ?? "Could not create subject" }, { status: 500 });

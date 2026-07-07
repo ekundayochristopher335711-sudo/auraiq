@@ -53,17 +53,26 @@ export async function POST(req: NextRequest) {
   const { topic, difficulty = "medium", count = 5, subjectId } = await req.json();
   const { client, model } = getAIClient();
 
-  // Pull the student's OWN uploaded material (their flashcards for this subject)
-  // so the exam is built from what they uploaded, not generic topic knowledge.
+  // Build the exam from the student's OWN uploaded material. Prefer the full
+  // extracted document text (fullest coverage); fall back to their flashcards.
   let sourceNotes = "";
   if (subjectId) {
-    const { data } = await supabase
-      .from("flashcards")
-      .select("question, answer")
-      .eq("subject_id", subjectId)
-      .limit(200);
-    if (data && data.length > 0) {
-      sourceNotes = data.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n").slice(0, 12000);
+    const { data: subj } = await supabase
+      .from("subjects")
+      .select("content")
+      .eq("id", subjectId)
+      .single();
+    if (subj?.content && subj.content.trim().length > 80) {
+      sourceNotes = subj.content.slice(0, 12000);
+    } else {
+      const { data } = await supabase
+        .from("flashcards")
+        .select("question, answer")
+        .eq("subject_id", subjectId)
+        .limit(200);
+      if (data && data.length > 0) {
+        sourceNotes = data.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n").slice(0, 12000);
+      }
     }
   }
 

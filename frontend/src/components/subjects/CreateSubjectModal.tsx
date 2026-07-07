@@ -19,6 +19,7 @@ export function CreateSubjectModal({ onClose, onCreated }: CreateSubjectModalPro
   const [uploadMode, setUploadMode] = useState(false);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<ExtractedContent | null>(null);
+  const [extractedText, setExtractedText] = useState("");
   const overlayRef = useRef<HTMLDivElement>(null);
 
   // Close on Escape
@@ -46,8 +47,9 @@ export function CreateSubjectModal({ onClose, onCreated }: CreateSubjectModalPro
     setStep("uploading");
     setError("");
     try {
-      const { preview: extracted } = await api.upload.extract(file);
+      const { preview: extracted, text } = await api.upload.extract(file);
       setPreview(extracted);
+      setExtractedText(text ?? "");
       setStep("preview");
     } catch (err: any) {
       setError(err.message ?? "Extraction failed. Try again.");
@@ -59,7 +61,7 @@ export function CreateSubjectModal({ onClose, onCreated }: CreateSubjectModalPro
     if (!preview) return;
     setStep("saving");
     try {
-      await api.upload.save(preview);
+      await api.upload.save(preview, undefined, extractedText);
       onCreated();
       onClose();
     } catch (err: any) {

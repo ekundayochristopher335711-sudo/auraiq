@@ -86,6 +86,7 @@ function SubjectDetailContent() {
   const [showUpload, setShowUpload] = useState(openUpload);
   const [uploadStep, setUploadStep] = useState<UploadStep>("idle");
   const [preview, setPreview] = useState<ExtractedContent | null>(null);
+  const [extractedText, setExtractedText] = useState("");
   const [uploadError, setUploadError] = useState("");
   const [savingPreview, setSavingPreview] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -146,8 +147,9 @@ function SubjectDetailContent() {
     setUploadStep("uploading");
     setUploadError("");
     try {
-      const { preview: extracted } = await api.upload.extract(file);
+      const { preview: extracted, text } = await api.upload.extract(file);
       setPreview(extracted);
+      setExtractedText(text ?? "");
       setUploadStep("preview");
     } catch (err: any) {
       setUploadError(err.message ?? "Extraction failed.");
@@ -159,8 +161,8 @@ function SubjectDetailContent() {
     if (!preview) return;
     setSavingPreview(true);
     try {
-      // Append the new material to THIS subject instead of creating a new one
-      await api.upload.save(preview, Number(id));
+      // Append the new material (structured + raw text) to THIS subject
+      await api.upload.save(preview, Number(id), extractedText);
       setShowUpload(false);
       setPreview(null);
       setUploadStep("idle");

@@ -92,7 +92,7 @@ export const api = {
   },
 
   upload: {
-    extract: async (file: File): Promise<{ preview: ExtractedContent; char_count: number }> => {
+    extract: async (file: File): Promise<{ preview: ExtractedContent; char_count: number; text: string }> => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error("Not authenticated");
 
@@ -113,7 +113,7 @@ export const api = {
         throw new Error(`File upload failed: ${msg}`);
       }
 
-      let result: { preview: ExtractedContent; char_count: number };
+      let result: { preview: ExtractedContent; char_count: number; text: string };
       try {
         const res = await fetch("/api/upload/extract", {
           method: "POST",
@@ -135,10 +135,10 @@ export const api = {
       }
       return result;
     },
-    save: (preview: ExtractedContent, subjectId?: number) =>
+    save: (preview: ExtractedContent, subjectId?: number, content?: string) =>
       apiRequest<{ subject_id: number; title: string; modules: number; flashcards_created: number }>(
         "/api/upload/save",
-        { method: "POST", body: JSON.stringify({ preview, subjectId }) }
+        { method: "POST", body: JSON.stringify({ preview, subjectId, content }) }
       ),
   },
 

@@ -20,6 +20,7 @@ create table if not exists public.subjects (
   user_id uuid references auth.users(id) on delete cascade not null,
   title text not null,
   description text,
+  content text,               -- accumulated extracted text from uploads (for full-document exams/summaries)
   mastery_score float default 0,
   created_at timestamptz default now()
 );

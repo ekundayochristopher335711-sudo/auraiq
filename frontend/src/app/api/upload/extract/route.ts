@@ -208,7 +208,9 @@ ${truncated}`;
     }
 
     const preview = JSON.parse(jsonMatch[0]);
-    return NextResponse.json({ preview, char_count: rawText.length });
+    // Return the extracted plain text too (capped) so it can be stored on the
+    // subject for full-document exam/summary generation.
+    return NextResponse.json({ preview, char_count: rawText.length, text: trimmed.slice(0, 40000) });
 
   } catch (err: any) {
     console.error("[Extract] Unexpected error:", err?.message);
