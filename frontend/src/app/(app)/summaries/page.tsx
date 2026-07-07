@@ -451,7 +451,7 @@ export default function SummariesPage() {
                 <span className="text-[10px] font-medium text-amber-400 bg-amber-500/10 rounded-full px-2 py-0.5 shrink-0">Unsaved</span>
               )}
             </p>
-            <div className="flex items-center gap-1.5">
+            <div className="flex flex-wrap items-center justify-end gap-1.5">
               {!saved && (
                 <button
                   onClick={saveSummary}
