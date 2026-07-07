@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText, Sparkles, BookOpen, ChevronDown, Loader2,
-  Play, Pause, Square, Copy, Check, Download, Volume2, Save, RotateCw, MousePointerClick,
+  Play, Pause, Square, Copy, Check, Download, Volume2, Save, RotateCw, MousePointerClick, Gauge,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Subject } from "@/lib/api";
@@ -10,6 +10,7 @@ import { useToast } from "@/context/ToastContext";
 import { cn } from "@/lib/utils";
 
 const ALL = "__all__";
+const SPEEDS = [0.75, 0.9, 1, 1.25, 1.5];   // read-aloud speeds, default slightly slow
 
 // ── Markdown helpers ──────────────────────────────────────────────────────────
 function stripInline(s: string): string {
@@ -96,9 +97,11 @@ export default function SummariesPage() {
 
   const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">("idle");
   const [activeId, setActiveId] = useState<number | null>(null);
+  const [rate, setRate] = useState(0.9);   // default read-aloud speed (slightly slow)
   const sentencesRef = useRef<string[]>([]);
   const idxRef = useRef(0);
   const genRef = useRef(0);   // generation token — invalidates callbacks from a cancelled run
+  const rateRef = useRef(0.9);
   const supportsSpeech = typeof window !== "undefined" && "speechSynthesis" in window;
 
   const currentSubjectId = selected === ALL ? null : Number(selected);
@@ -106,6 +109,8 @@ export default function SummariesPage() {
 
   // Keep the speech queue in sync with what's on screen
   useEffect(() => { sentencesRef.current = parsed.sentences; }, [parsed]);
+  // Keep the latest rate available to in-flight speech callbacks
+  useEffect(() => { rateRef.current = rate; }, [rate]);
 
   useEffect(() => {
     api.subjects.list().then(setSubjects).catch(() => {});
@@ -140,7 +145,7 @@ export default function SummariesPage() {
       if (i >= arr.length) { setSpeechState("idle"); setActiveId(null); idxRef.current = 0; return; }
       setActiveId(i);
       const utter = new SpeechSynthesisUtterance(arr[i]);
-      utter.rate = 1;
+      utter.rate = rateRef.current;
       utter.pitch = 1;
       utter.onend = () => {
         if (gen !== genRef.current) return;          // ignore end-events from cancelled speech
@@ -171,6 +176,14 @@ export default function SummariesPage() {
     if (!supportsSpeech) return;
     window.speechSynthesis.pause();
     setSpeechState("paused");
+  };
+
+  // Cycle to the next speed; if currently reading, restart the current sentence at the new speed
+  const cycleSpeed = () => {
+    const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length] ?? 1;
+    rateRef.current = next;
+    setRate(next);
+    if (speechState === "playing") startSpeaking(idxRef.current);
   };
 
   // When the selected scope changes, load any previously saved summary for it
@@ -382,6 +395,14 @@ export default function SummariesPage() {
               )}
               {supportsSpeech && (
                 <>
+                  <button
+                    onClick={cycleSpeed}
+                    title="Reading speed"
+                    className="flex items-center gap-1 text-xs font-medium text-gray-300 border border-white/10 hover:bg-white/5 rounded-lg px-2.5 py-2 transition-colors"
+                  >
+                    <Gauge size={13} className="text-violet-400" />
+                    {rate}×
+                  </button>
                   {speechState !== "playing" ? (
                     <button
                       onClick={handlePlay}
