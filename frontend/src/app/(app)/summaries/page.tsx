@@ -12,26 +12,32 @@ import { cn } from "@/lib/utils";
 const ALL = "__all__";
 const SPEEDS = [0.75, 0.9, 1, 1.25, 1.5];   // read-aloud speeds, default slightly slow
 
-// Curate up to 4 distinct English voices from whatever the device offers.
+// Curate up to 4 natural English voices, best-sounding first (so the default
+// is a clear US/UK voice, not a strong regional accent like Moira/Irish).
 function pickVoices(all: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
   const en = all.filter((v) => v.lang?.toLowerCase().startsWith("en"));
-  // Prefer well-known natural voices first, for variety (male/female, US/UK)
-  const prefer = [
-    "Google US English", "Google UK English Female", "Google UK English Male",
-    "Samantha", "Daniel", "Karen", "Moira", "Microsoft Aria", "Microsoft Zira",
-    "Microsoft Guy", "Microsoft David",
+  // Highest-quality, most neutral voices across platforms, ranked
+  const preferred = [
+    "Samantha", "Google US English", "Microsoft Aria", "Microsoft Zira",
+    "Google UK English Female", "Karen", "Daniel", "Google UK English Male", "Microsoft Guy",
   ];
+  const score = (v: SpeechSynthesisVoice) => {
+    let s = 0;
+    const idx = preferred.indexOf(v.name);
+    if (idx !== -1) s += 100 - idx;          // known good voices win
+    const lang = v.lang?.toLowerCase() ?? "";
+    if (lang === "en-us") s += 20;
+    else if (lang === "en-gb") s += 12;
+    else if (lang === "en-au") s += 6;
+    if (v.default) s += 4;
+    if (v.localService) s += 2;
+    return s;
+  };
   const seen = new Set<string>();
-  const result: SpeechSynthesisVoice[] = [];
-  for (const name of prefer) {
-    const v = en.find((x) => x.name === name);
-    if (v && !seen.has(v.voiceURI)) { result.push(v); seen.add(v.voiceURI); }
-  }
-  for (const v of en) {
-    if (result.length >= 4) break;
-    if (!seen.has(v.voiceURI)) { result.push(v); seen.add(v.voiceURI); }
-  }
-  return result.slice(0, 4);
+  return [...en]
+    .sort((a, b) => score(b) - score(a))
+    .filter((v) => (seen.has(v.name) ? false : (seen.add(v.name), true)))
+    .slice(0, 4);
 }
 
 // Shorten a voice name for the dropdown label
@@ -433,9 +439,9 @@ export default function SummariesPage() {
 
       {/* Summary output */}
       {summary && !loading && (
-        <div className="rounded-2xl bg-[#141414] border border-white/8 overflow-hidden">
+        <div className="rounded-2xl bg-[#141414] border border-white/8">
           {/* Toolbar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-white/8 bg-[#111]">
+          <div className="flex flex-wrap items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-white/8 bg-[#111] rounded-t-2xl">
             <p className="text-sm font-semibold text-white flex items-center gap-2 min-w-0">
               <FileText size={15} className="text-violet-400 shrink-0" />
               <span className="truncate">{summaryLabel}</span>
@@ -473,7 +479,7 @@ export default function SummariesPage() {
                       {showVoiceMenu && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowVoiceMenu(false)} />
-                          <div className="absolute right-0 top-full mt-1.5 w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
+                          <div className="absolute left-0 top-full mt-1.5 w-44 max-w-[calc(100vw-3rem)] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
                             {voices.map((v) => (
                               <button
                                 key={v.voiceURI}
