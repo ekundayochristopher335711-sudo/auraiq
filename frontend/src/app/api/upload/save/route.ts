@@ -15,17 +15,30 @@ export async function POST(req: NextRequest) {
   const { client: supabase, user } = await getAuthenticatedClient(req);
   if (!supabase || !user) return NextResponse.json({ detail: "Unauthorized" }, { status: 401 });
 
-  const { preview } = await req.json();
+  const { preview, subjectId } = await req.json();
   if (!preview) return NextResponse.json({ detail: "No content provided" }, { status: 400 });
 
-  // Create subject
-  const { data: subject, error: subjectError } = await supabase
-    .from("subjects")
-    .insert({ title: preview.subject_title, description: preview.subject_description, user_id: user.id })
-    .select()
-    .single();
+  let subject: { id: number; title: string };
 
-  if (subjectError) return NextResponse.json({ detail: subjectError.message }, { status: 500 });
+  if (subjectId) {
+    // Append to an existing subject (RLS ensures it belongs to this user)
+    const { data, error } = await supabase
+      .from("subjects")
+      .select("id, title")
+      .eq("id", subjectId)
+      .single();
+    if (error || !data) return NextResponse.json({ detail: "Subject not found" }, { status: 404 });
+    subject = data;
+  } else {
+    // Create a new subject from the extracted content
+    const { data, error: subjectError } = await supabase
+      .from("subjects")
+      .insert({ title: preview.subject_title, description: preview.subject_description, user_id: user.id })
+      .select()
+      .single();
+    if (subjectError || !data) return NextResponse.json({ detail: subjectError?.message ?? "Could not create subject" }, { status: 500 });
+    subject = data;
+  }
 
   // Insert all flashcards from all modules
   const flashcards: any[] = [];

@@ -135,10 +135,10 @@ export const api = {
       }
       return result;
     },
-    save: (preview: ExtractedContent) =>
+    save: (preview: ExtractedContent, subjectId?: number) =>
       apiRequest<{ subject_id: number; title: string; modules: number; flashcards_created: number }>(
         "/api/upload/save",
-        { method: "POST", body: JSON.stringify({ preview }) }
+        { method: "POST", body: JSON.stringify({ preview, subjectId }) }
       ),
   },
 

@@ -159,7 +159,8 @@ function SubjectDetailContent() {
     if (!preview) return;
     setSavingPreview(true);
     try {
-      await api.upload.save(preview);
+      // Append the new material to THIS subject instead of creating a new one
+      await api.upload.save(preview, Number(id));
       setShowUpload(false);
       setPreview(null);
       setUploadStep("idle");
