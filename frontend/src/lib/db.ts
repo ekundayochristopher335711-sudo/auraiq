@@ -235,10 +235,11 @@ export async function getDashboard() {
     };
   });
 
-  // Real forgetting forecasts: cards due within next 24 hours or already overdue
-  const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+  // Real forgetting forecasts: concepts approaching their review time within the
+  // next 7 days (or already overdue) — a genuine forecast, not just today's queue.
+  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
   const forgetting_forecasts = cards
-    .filter((c) => c.next_review_at && new Date(c.next_review_at) <= in24h)
+    .filter((c) => c.next_review_at && new Date(c.next_review_at) <= in7days)
     .sort((a, b) => new Date(a.next_review_at!).getTime() - new Date(b.next_review_at!).getTime())
     .slice(0, 5)
     .map((c) => {

@@ -17,7 +17,7 @@ interface ForgettingForecastProps {
 const urgencyConfig = {
   critical: { icon: AlertTriangle, color: "text-red-400", bg: "bg-red-500/10", border: "border-red-500/20", label: "Review Now" },
   high: { icon: Zap, color: "text-orange-400", bg: "bg-orange-500/10", border: "border-orange-500/20", label: "Review Soon" },
-  medium: { icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", label: "Due Today" },
+  medium: { icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10", border: "border-amber-500/20", label: "Upcoming" },
 };
 
 export function ForgettingForecast({ forecasts, queueCount }: ForgettingForecastProps) {
@@ -53,7 +53,13 @@ export function ForgettingForecast({ forecasts, queueCount }: ForgettingForecast
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-200 truncate">{f.concept}</p>
-                  <p className="text-xs text-gray-500">{f.subject} · {f.hours_until_forgotten}h left</p>
+                  <p className="text-xs text-gray-500">
+                    {f.subject} · {f.hours_until_forgotten <= 0
+                      ? "due now"
+                      : f.hours_until_forgotten >= 24
+                      ? `${Math.round(f.hours_until_forgotten / 24)}d left`
+                      : `${f.hours_until_forgotten}h left`}
+                  </p>
                 </div>
                 <span className={cn("text-xs font-semibold shrink-0", cfg.color)}>{cfg.label}</span>
               </div>

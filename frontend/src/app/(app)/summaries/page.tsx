@@ -12,38 +12,70 @@ import { cn } from "@/lib/utils";
 const ALL = "__all__";
 const SPEEDS = [0.75, 0.9, 1, 1.25, 1.5];   // read-aloud speeds, default slightly slow
 
-// Curate up to 4 natural English voices, best-sounding first (so the default
-// is a clear US/UK voice, not a strong regional accent like Moira/Irish).
-function pickVoices(all: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
-  const en = all.filter((v) => v.lang?.toLowerCase().startsWith("en"));
-  // Highest-quality, most neutral voices across platforms, ranked
-  const preferred = [
-    "Samantha", "Google US English", "Microsoft Aria", "Microsoft Zira",
-    "Google UK English Female", "Karen", "Daniel", "Google UK English Male", "Microsoft Guy",
-  ];
-  const score = (v: SpeechSynthesisVoice) => {
-    let s = 0;
-    const idx = preferred.indexOf(v.name);
-    if (idx !== -1) s += 100 - idx;          // known good voices win
-    const lang = v.lang?.toLowerCase() ?? "";
-    if (lang === "en-us") s += 20;
-    else if (lang === "en-gb") s += 12;
-    else if (lang === "en-au") s += 6;
-    if (v.default) s += 4;
-    if (v.localService) s += 2;
-    return s;
-  };
-  const seen = new Set<string>();
-  return [...en]
-    .sort((a, b) => score(b) - score(a))
-    .filter((v) => (seen.has(v.name) ? false : (seen.add(v.name), true)))
-    .slice(0, 4);
+// Pick up to 4 BALANCED English voices — one per accent/region, so the user
+// gets real variety instead of four near-identical US voices. Nigerian English
+// is prioritised where the device provides it (mainly Android/Chrome; iOS has
+// no en-NG voice, so it simply won't appear there).
+const REGION_ORDER = ["en-ng", "en-gb", "en-us", "en-au", "en-in", "en-ie", "en-za", "en-ca", "en-nz"];
+const PREFERRED_NAMES = [
+  "Google Nigerian English", "Google UK English Female", "Google UK English Male",
+  "Daniel", "Samantha", "Google US English", "Microsoft Aria", "Microsoft Zira",
+  "Karen", "Rishi", "Tessa", "Moira", "Microsoft Guy",
+];
+
+function voiceQuality(v: SpeechSynthesisVoice): number {
+  let s = 0;
+  const idx = PREFERRED_NAMES.indexOf(v.name);
+  if (idx !== -1) s += 100 - idx;
+  if (v.default) s += 5;
+  if (v.localService) s += 3;
+  return s;
 }
 
-// Shorten a voice name for the dropdown label
+function pickVoices(all: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  const en = all.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+  if (en.length === 0) return [];
+
+  // Best voice per region
+  const bestByRegion = new Map<string, SpeechSynthesisVoice>();
+  for (const v of en) {
+    const lang = v.lang?.toLowerCase() ?? "en";
+    const cur = bestByRegion.get(lang);
+    if (!cur || voiceQuality(v) > voiceQuality(cur)) bestByRegion.set(lang, v);
+  }
+
+  const result: SpeechSynthesisVoice[] = [];
+  const usedLangs = new Set<string>();
+  // Preferred regions first (Nigerian, UK, US, …) for a balanced spread
+  for (const r of REGION_ORDER) {
+    const v = bestByRegion.get(r);
+    if (v) { result.push(v); usedLangs.add(r); }
+    if (result.length >= 4) return result;
+  }
+  // Any remaining regions the device offers
+  for (const [lang, v] of bestByRegion) {
+    if (result.length >= 4) break;
+    if (!usedLangs.has(lang)) { result.push(v); usedLangs.add(lang); }
+  }
+  // Still short (few regions)? fill with next-best distinct voices
+  if (result.length < 4) {
+    const chosen = new Set(result.map((v) => v.name));
+    for (const v of [...en].sort((a, b) => voiceQuality(b) - voiceQuality(a))) {
+      if (result.length >= 4) break;
+      if (!chosen.has(v.name)) { result.push(v); chosen.add(v.name); }
+    }
+  }
+  return result.slice(0, 4);
+}
+
+// Shorten a voice name for the dropdown label + show its accent
+const REGION_LABEL: Record<string, string> = {
+  "en-ng": "Nigeria", "en-gb": "UK", "en-us": "US", "en-au": "AU",
+  "en-in": "India", "en-ie": "Ireland", "en-za": "SA", "en-ca": "CA", "en-nz": "NZ",
+};
 function voiceLabel(v: SpeechSynthesisVoice): string {
-  let name = v.name.split(" - ")[0].replace(/^(Microsoft|Google)\s+/, "").trim();
-  const region = v.lang?.toUpperCase().includes("GB") ? "UK" : v.lang?.toUpperCase().includes("US") ? "US" : "";
+  const name = v.name.split(" - ")[0].replace(/^(Microsoft|Google)\s+/, "").replace(/\s+English$/i, "").trim();
+  const region = REGION_LABEL[v.lang?.toLowerCase() ?? ""] ?? "";
   return region ? `${name} (${region})` : name;
 }
 
