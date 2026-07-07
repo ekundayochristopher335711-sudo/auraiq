@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText, Sparkles, BookOpen, ChevronDown, Loader2,
-  Play, Pause, Square, Copy, Check, Download, Volume2, Save, RotateCw, MousePointerClick, Gauge,
+  Play, Pause, Square, Copy, Check, Download, Volume2, Save, RotateCw, MousePointerClick, Gauge, AudioLines,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Subject } from "@/lib/api";
@@ -11,6 +11,35 @@ import { cn } from "@/lib/utils";
 
 const ALL = "__all__";
 const SPEEDS = [0.75, 0.9, 1, 1.25, 1.5];   // read-aloud speeds, default slightly slow
+
+// Curate up to 4 distinct English voices from whatever the device offers.
+function pickVoices(all: SpeechSynthesisVoice[]): SpeechSynthesisVoice[] {
+  const en = all.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+  // Prefer well-known natural voices first, for variety (male/female, US/UK)
+  const prefer = [
+    "Google US English", "Google UK English Female", "Google UK English Male",
+    "Samantha", "Daniel", "Karen", "Moira", "Microsoft Aria", "Microsoft Zira",
+    "Microsoft Guy", "Microsoft David",
+  ];
+  const seen = new Set<string>();
+  const result: SpeechSynthesisVoice[] = [];
+  for (const name of prefer) {
+    const v = en.find((x) => x.name === name);
+    if (v && !seen.has(v.voiceURI)) { result.push(v); seen.add(v.voiceURI); }
+  }
+  for (const v of en) {
+    if (result.length >= 4) break;
+    if (!seen.has(v.voiceURI)) { result.push(v); seen.add(v.voiceURI); }
+  }
+  return result.slice(0, 4);
+}
+
+// Shorten a voice name for the dropdown label
+function voiceLabel(v: SpeechSynthesisVoice): string {
+  let name = v.name.split(" - ")[0].replace(/^(Microsoft|Google)\s+/, "").trim();
+  const region = v.lang?.toUpperCase().includes("GB") ? "UK" : v.lang?.toUpperCase().includes("US") ? "US" : "";
+  return region ? `${name} (${region})` : name;
+}
 
 // ── Markdown helpers ──────────────────────────────────────────────────────────
 function stripInline(s: string): string {
@@ -98,10 +127,14 @@ export default function SummariesPage() {
   const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">("idle");
   const [activeId, setActiveId] = useState<number | null>(null);
   const [rate, setRate] = useState(0.9);   // default read-aloud speed (slightly slow)
+  const [voices, setVoices] = useState<SpeechSynthesisVoice[]>([]);
+  const [voiceURI, setVoiceURI] = useState<string>("");
+  const [showVoiceMenu, setShowVoiceMenu] = useState(false);
   const sentencesRef = useRef<string[]>([]);
   const idxRef = useRef(0);
   const genRef = useRef(0);   // generation token — invalidates callbacks from a cancelled run
   const rateRef = useRef(0.9);
+  const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const supportsSpeech = typeof window !== "undefined" && "speechSynthesis" in window;
 
   const currentSubjectId = selected === ALL ? null : Number(selected);
@@ -111,6 +144,26 @@ export default function SummariesPage() {
   useEffect(() => { sentencesRef.current = parsed.sentences; }, [parsed]);
   // Keep the latest rate available to in-flight speech callbacks
   useEffect(() => { rateRef.current = rate; }, [rate]);
+
+  // Load the device's speech voices (they arrive asynchronously) and curate a short English list
+  useEffect(() => {
+    if (!supportsSpeech) return;
+    const load = () => {
+      const picked = pickVoices(window.speechSynthesis.getVoices());
+      if (picked.length === 0) return;
+      setVoices(picked);
+      setVoiceURI((cur) => {
+        if (cur && picked.some((v) => v.voiceURI === cur)) return cur;
+        const def = picked[0];
+        voiceRef.current = def;
+        return def.voiceURI;
+      });
+    };
+    load();
+    window.speechSynthesis.addEventListener("voiceschanged", load);
+    return () => window.speechSynthesis.removeEventListener("voiceschanged", load);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   useEffect(() => {
     api.subjects.list().then(setSubjects).catch(() => {});
@@ -147,6 +200,7 @@ export default function SummariesPage() {
       const utter = new SpeechSynthesisUtterance(arr[i]);
       utter.rate = rateRef.current;
       utter.pitch = 1;
+      if (voiceRef.current) { utter.voice = voiceRef.current; utter.lang = voiceRef.current.lang; }
       utter.onend = () => {
         if (gen !== genRef.current) return;          // ignore end-events from cancelled speech
         idxRef.current += 1;
@@ -185,6 +239,15 @@ export default function SummariesPage() {
     setRate(next);
     if (speechState === "playing") startSpeaking(idxRef.current);
   };
+
+  const changeVoice = (v: SpeechSynthesisVoice) => {
+    voiceRef.current = v;
+    setVoiceURI(v.voiceURI);
+    setShowVoiceMenu(false);
+    if (speechState === "playing") startSpeaking(idxRef.current);
+  };
+
+  const currentVoice = voices.find((v) => v.voiceURI === voiceURI);
 
   // When the selected scope changes, load any previously saved summary for it
   useEffect(() => {
@@ -395,6 +458,37 @@ export default function SummariesPage() {
               )}
               {supportsSpeech && (
                 <>
+                  {/* Voice selector */}
+                  {voices.length > 1 && (
+                    <div className="relative">
+                      <button
+                        onClick={() => setShowVoiceMenu((v) => !v)}
+                        title="Voice"
+                        className="flex items-center gap-1 text-xs font-medium text-gray-300 border border-white/10 hover:bg-white/5 rounded-lg px-2.5 py-2 transition-colors max-w-[130px]"
+                      >
+                        <AudioLines size={13} className="text-violet-400 shrink-0" />
+                        <span className="truncate">{currentVoice ? voiceLabel(currentVoice) : "Voice"}</span>
+                        <ChevronDown size={11} className={cn("text-gray-500 transition-transform shrink-0", showVoiceMenu && "rotate-180")} />
+                      </button>
+                      {showVoiceMenu && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setShowVoiceMenu(false)} />
+                          <div className="absolute right-0 top-full mt-1.5 w-48 bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
+                            {voices.map((v) => (
+                              <button
+                                key={v.voiceURI}
+                                onClick={() => changeVoice(v)}
+                                className={cn("w-full text-left px-3.5 py-2 text-xs transition-colors truncate",
+                                  v.voiceURI === voiceURI ? "text-violet-400 bg-violet-500/10" : "text-gray-300 hover:bg-white/5")}
+                              >
+                                {voiceLabel(v)}
+                              </button>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  )}
                   <button
                     onClick={cycleSpeed}
                     title="Reading speed"
