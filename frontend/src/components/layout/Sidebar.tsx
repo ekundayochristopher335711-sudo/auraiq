@@ -156,10 +156,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           <div className="px-3 pt-1 pb-0.5">
             <p className="text-[10px] text-gray-700 text-center">
               Built by{" "}
-              <span className="font-bold tracking-wide"
+              <a href="https://arlotech.com.ng" target="_blank" rel="noopener noreferrer" className="font-bold tracking-wide hover:opacity-80 transition-opacity"
                 style={{ background: "linear-gradient(135deg,#f59e0b,#d97706)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
                 ARLOTECH
-              </span>
+              </a>
             </p>
           </div>
 

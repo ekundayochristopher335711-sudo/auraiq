@@ -43,7 +43,10 @@ function SubjectCard({ subject, index, onDelete }: { subject: Subject; index: nu
   const statusColor = pct >= 75 ? "text-emerald-400" : pct >= 45 ? "text-amber-400" : "text-red-400";
 
   return (
-    <div className="group relative rounded-2xl bg-[#141414] border border-white/8 overflow-visible hover:border-white/15 transition-all">
+    <div className={cn(
+      "group relative rounded-2xl bg-[#141414] border border-white/8 overflow-visible hover:border-white/15 transition-all",
+      menuOpen && "z-30"
+    )}>
       <div className={cn("h-1.5 w-full bg-linear-to-r rounded-t-2xl", gradient)} />
       <div className="p-5">
         <div className="flex items-start justify-between gap-3 mb-4">
