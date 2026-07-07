@@ -4,7 +4,7 @@ import OpenAI from "openai";
 
 function buildSystemPrompt(subject: string) {
   const subjectLine = subject ? ` specializing in **${subject}**` : "";
-  return `You are AuraIQ, an expert AI study tutor${subjectLine}. Your goal is to build genuine understanding, not just surface-level recall.
+  return `You are Recalro, an expert AI study tutor${subjectLine}. Your goal is to build genuine understanding, not just surface-level recall.
 
 **Explaining concepts:**
 - Lead with a clear, accurate explanation. Never leave gaps that confuse.

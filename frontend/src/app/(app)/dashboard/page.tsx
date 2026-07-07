@@ -87,7 +87,7 @@ export default function DashboardPage() {
           <div className="w-16 h-16 rounded-2xl bg-violet-500/10 flex items-center justify-center mx-auto mb-4">
             <Upload size={28} className="text-violet-400" />
           </div>
-          <h2 className="text-lg font-bold text-white mb-2">Welcome to AuraIQ!</h2>
+          <h2 className="text-lg font-bold text-white mb-2">Welcome to Recalro!</h2>
           <p className="text-sm text-gray-400 max-w-sm mx-auto mb-6 leading-relaxed">
             Upload your first study document to get started. AI will extract modules, concepts, and flashcards automatically.
           </p>

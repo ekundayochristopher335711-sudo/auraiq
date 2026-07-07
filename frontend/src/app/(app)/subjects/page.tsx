@@ -109,7 +109,7 @@ function EmptyState({ onAdd }: { onAdd: () => void }) {
       </div>
       <h3 className="text-base font-semibold text-white mb-1">No subjects yet</h3>
       <p className="text-sm text-gray-500 max-w-xs mb-6">
-        Create your first subject manually or upload a PDF and let AuraIQ build your study system in seconds.
+        Create your first subject manually or upload a PDF and let Recalro build your study system in seconds.
       </p>
       <button onClick={onAdd}
         className="flex items-center gap-2 bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl px-5 py-2.5 transition-colors">

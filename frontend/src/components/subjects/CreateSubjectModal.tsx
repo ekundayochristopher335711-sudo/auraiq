@@ -121,7 +121,7 @@ export function CreateSubjectModal({ onClose, onCreated }: CreateSubjectModalPro
               </div>
               <div className="text-center">
                 <p className="text-sm font-medium text-white">Analyzing your document...</p>
-                <p className="text-xs text-gray-500 mt-1">AuraIQ is extracting concepts & building flashcards</p>
+                <p className="text-xs text-gray-500 mt-1">Recalro is extracting concepts & building flashcards</p>
               </div>
             </div>
           )}

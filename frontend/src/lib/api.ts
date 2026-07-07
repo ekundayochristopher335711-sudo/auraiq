@@ -83,6 +83,7 @@ export const api = {
     due: () => db.getDueFlashcards(),
     review: (flashcard_id: number, quality: number) => db.reviewFlashcard(flashcard_id, quality),
     delete: (id: number) => db.deleteFlashcard(id),
+    all: () => db.getAllFlashcards(),
   },
 
   sessions: {
@@ -152,6 +153,18 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ topic, difficulty, count }),
       }),
+    summarize: (subject: string, content: string) =>
+      apiRequest<{ summary: string }>("/api/ai/summarize", {
+        method: "POST",
+        body: JSON.stringify({ subject, content }),
+      }),
+  },
+
+  summaries: {
+    get: (subjectId: number | null) => db.getSummary(subjectId),
+    save: (subjectId: number | null, scopeLabel: string, content: string) =>
+      db.saveSummary(subjectId, scopeLabel, content),
+    delete: (subjectId: number | null) => db.deleteSummary(subjectId),
   },
 };
 

@@ -1,6 +1,6 @@
 {
-  "name": "AuraIQ — Cognitive Mastery Engine",
-  "short_name": "AuraIQ",
+  "name": "Recalro — Cognitive Mastery Engine",
+  "short_name": "Recalro",
   "description": "AI-powered certification exam prep. Upload study material, get flashcards, track mastery.",
   "start_url": "/dashboard",
   "scope": "/",

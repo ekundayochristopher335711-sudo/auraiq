@@ -38,6 +38,17 @@ create table if not exists public.flashcards (
   created_at timestamptz default now()
 );
 
+-- Saved note summaries (one per subject; subject_id null = "All Subjects")
+create table if not exists public.summaries (
+  id bigserial primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  subject_id bigint references public.subjects(id) on delete cascade,
+  scope_label text not null,
+  content text not null,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- Study sessions
 create table if not exists public.study_sessions (
   id bigserial primary key,
@@ -55,6 +66,7 @@ alter table public.profiles enable row level security;
 alter table public.subjects enable row level security;
 alter table public.flashcards enable row level security;
 alter table public.study_sessions enable row level security;
+alter table public.summaries enable row level security;
 
 -- ── RLS Policies ───────────────────────────────────────────
 -- profiles
@@ -68,6 +80,9 @@ create policy "own flashcards" on public.flashcards for all using (auth.uid() = 
 
 -- sessions
 create policy "own sessions" on public.study_sessions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- summaries
+create policy "own summaries" on public.summaries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ── Auto-create profile on signup ──────────────────────────
 create or replace function public.handle_new_user()

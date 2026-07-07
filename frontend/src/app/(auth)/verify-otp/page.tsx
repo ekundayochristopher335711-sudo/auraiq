@@ -14,7 +14,7 @@ function VerifyOTPContent() {
         <div className="w-9 h-9 rounded-xl bg-violet-600 flex items-center justify-center">
           <Brain size={18} className="text-white" />
         </div>
-        <span className="text-white font-bold text-xl tracking-tight">AuraIQ</span>
+        <span className="text-white font-bold text-xl tracking-tight">Recalro</span>
       </div>
 
       <div className="bg-[#111111] border border-white/8 rounded-2xl p-8 text-center">

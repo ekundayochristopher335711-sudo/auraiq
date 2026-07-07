@@ -44,7 +44,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <div className="w-6 h-6 rounded-lg bg-violet-600 flex items-center justify-center">
                 <Brain size={12} className="text-white" />
               </div>
-              <span className="text-white font-bold text-base tracking-tight">AuraIQ</span>
+              <span className="text-white font-bold text-base tracking-tight">Recalro</span>
             </div>
           </div>
 

@@ -8,7 +8,7 @@ const STEPS = [
   {
     icon: Brain,
     color: "bg-violet-500/10 text-violet-400",
-    title: "Welcome to AuraIQ 🎉",
+    title: "Welcome to Recalro 🎉",
     desc: "Your AI-powered cognitive mastery engine. Upload study materials and let AI transform them into a personalized learning system.",
     action: "Get Started",
   },
@@ -16,7 +16,7 @@ const STEPS = [
     icon: Upload,
     color: "bg-blue-500/10 text-blue-400",
     title: "Upload your study material",
-    desc: "Go to Subjects → Create a subject → Upload a PDF or DOCX. AuraIQ will extract modules, concepts, and flashcards automatically.",
+    desc: "Go to Subjects → Create a subject → Upload a PDF or DOCX. Recalro will extract modules, concepts, and flashcards automatically.",
     action: "Go to Subjects",
   },
   {

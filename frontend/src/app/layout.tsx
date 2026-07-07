@@ -3,14 +3,14 @@ import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 
 export const metadata: Metadata = {
-  title: "AuraIQ — Cognitive Mastery Engine",
+  title: "Recalro — Cognitive Mastery Engine",
   description: "Transform study materials into personalized learning systems. Predict exam readiness. Master any certification.",
   manifest: "/manifest.json",
   themeColor: "#7c3aed",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "AuraIQ",
+    title: "Recalro",
   },
   viewport: {
     width: "device-width",

@@ -40,6 +40,55 @@ export async function deleteSubject(id: number) {
   if (error) throw error;
 }
 
+// ── Summaries ─────────────────────────────────────────────────────────────────
+export async function getSummary(subjectId: number | null) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  let query = supabase
+    .from("summaries")
+    .select("*")
+    .eq("user_id", user.id)
+    .limit(1);
+  query = subjectId === null ? query.is("subject_id", null) : query.eq("subject_id", subjectId);
+  const { data, error } = await query;
+  if (error) throw error;
+  return data?.[0] ?? null;
+}
+
+export async function saveSummary(subjectId: number | null, scopeLabel: string, content: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+
+  // One saved summary per scope — update if it exists, else insert
+  const existing = await getSummary(subjectId);
+  if (existing) {
+    const { data, error } = await supabase
+      .from("summaries")
+      .update({ content, scope_label: scopeLabel, updated_at: new Date().toISOString() })
+      .eq("id", existing.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return data;
+  }
+  const { data, error } = await supabase
+    .from("summaries")
+    .insert({ user_id: user.id, subject_id: subjectId, scope_label: scopeLabel, content })
+    .select()
+    .single();
+  if (error) throw error;
+  return data;
+}
+
+export async function deleteSummary(subjectId: number | null) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  let query = supabase.from("summaries").delete().eq("user_id", user.id);
+  query = subjectId === null ? query.is("subject_id", null) : query.eq("subject_id", subjectId);
+  const { error } = await query;
+  if (error) throw error;
+}
+
 // ── Flashcards ────────────────────────────────────────────────────────────────
 export async function getSubjectFlashcards(subjectId: number) {
   const { data, error } = await supabase
@@ -54,6 +103,18 @@ export async function getSubjectFlashcards(subjectId: number) {
 export async function deleteFlashcard(id: number) {
   const { error } = await supabase.from("flashcards").delete().eq("id", id);
   if (error) throw error;
+}
+
+export async function getAllFlashcards() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data, error } = await supabase
+    .from("flashcards")
+    .select("question, answer, subjects(title)")
+    .eq("user_id", user.id)
+    .order("created_at", { ascending: false });
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function getDueFlashcards() {

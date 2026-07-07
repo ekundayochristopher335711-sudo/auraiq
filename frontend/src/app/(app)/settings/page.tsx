@@ -28,7 +28,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
           <div className="flex items-start justify-between">
             <div>
               <p className="text-xs font-semibold text-violet-200 uppercase tracking-wider mb-1">Upgrade to</p>
-              <h2 className="text-2xl font-bold text-white">AuraIQ Pro</h2>
+              <h2 className="text-2xl font-bold text-white">Recalro Pro</h2>
             </div>
             <button onClick={onClose} className="text-white/60 hover:text-white transition-colors">
               <X size={20} />
@@ -48,7 +48,7 @@ function UpgradeModal({ onClose }: { onClose: () => void }) {
           <div className="border-t border-white/8 pt-4">
             <p className="text-center text-xs text-gray-500 mb-3">Billing handled securely via Stripe</p>
             <a
-              href="mailto:support@auraiq.app?subject=Pro%20Upgrade"
+              href="mailto:support@recalro.com?subject=Pro%20Upgrade"
               className="flex items-center justify-center gap-2 w-full bg-violet-600 hover:bg-violet-500 text-white text-sm font-semibold rounded-xl py-3 transition-colors"
             >
               <Zap size={15} /> Contact us to upgrade

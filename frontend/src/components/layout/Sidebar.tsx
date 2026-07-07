@@ -4,7 +4,7 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import {
   LayoutDashboard, BookOpen, BarChart3, Target,
-  Brain, Settings, LogOut, Zap, X, Sun, Moon, Monitor
+  Brain, Settings, LogOut, Zap, X, Sun, Moon, Monitor, FileText
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
@@ -13,6 +13,7 @@ const NAV_ITEMS = [
   { href: "/dashboard",  label: "Dashboard",  icon: LayoutDashboard },
   { href: "/subjects",   label: "Subjects",   icon: BookOpen        },
   { href: "/flashcards", label: "Flashcards", icon: Zap             },
+  { href: "/summaries",  label: "Summaries",  icon: FileText        },
   { href: "/analytics",  label: "Analytics",  icon: BarChart3       },
   { href: "/exam-sim",   label: "Exam Sim",   icon: Target          },
   { href: "/ai-tutor",   label: "AI Tutor",   icon: Brain           },
@@ -89,7 +90,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
             <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center">
               <Brain size={16} className="text-white" />
             </div>
-            <span className="text-white font-bold text-lg tracking-tight">AuraIQ</span>
+            <span className="text-white font-bold text-lg tracking-tight">Recalro</span>
           </div>
           <button onClick={onClose} className="lg:hidden text-gray-500 hover:text-gray-300 transition-colors">
             <X size={16} />
