@@ -207,7 +207,7 @@ export default function AiTutorPage() {
   };
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden">
+    <div className="flex flex-col h-dvh overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/8 bg-[#0d0d0d] shrink-0 relative z-30">
         <div className="flex items-center gap-2 min-w-0">

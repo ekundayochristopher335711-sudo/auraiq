@@ -5,14 +5,22 @@
 p, span, label, td, li, a { font-weight: 500; }
 
 /* ── Dark mode base — deep gradient background ───────────────────────────── */
-body {
-  background-color: #080810;
+/* Base colour on <html> avoids a flash; the gradient lives on a fixed ::before
+   layer instead of `background-attachment: fixed`, which is janky on mobile
+   (it rescales as the address bar collapses, looking like an auto-zoom). */
+html { background-color: #080810; }
+body { min-height: 100vh; }
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
   background-image:
     radial-gradient(ellipse at 15% 10%,  rgba(124,58,237,0.18) 0%, transparent 45%),
     radial-gradient(ellipse at 85% 80%,  rgba(99,102,241,0.12) 0%, transparent 45%),
     radial-gradient(ellipse at 50% 50%,  rgba(139,92,246,0.06) 0%, transparent 60%);
-  background-attachment: fixed;
-  min-height: 100vh;
 }
 
 /* ── Global glass cards (dark mode) ─────────────────────────────────────── */
@@ -37,15 +45,15 @@ body {
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
 
 /* ── LIGHT MODE ──────────────────────────────────────────────────────────── */
-html:not(.dark) body {
-  background-color: transparent;
+html:not(.dark) { background-color: #dce8f8; }
+html:not(.dark) body { background-color: transparent; }
+
+html:not(.dark) body::before {
   background-image:
     radial-gradient(ellipse at 0% 0%,   rgba(178,232,224,0.95) 0%, transparent 55%),
     radial-gradient(ellipse at 100% 5%,  rgba(212,221,245,0.85) 0%, transparent 50%),
     radial-gradient(ellipse at 60% 100%, rgba(232,216,240,0.9)  0%, transparent 55%),
     linear-gradient(135deg, #c8ede8 0%, #f0eaf8 55%, #dce8f8 100%);
-  background-attachment: fixed;
-  min-height: 100vh;
 }
 
 html:not(.dark) aside {

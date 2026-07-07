@@ -628,7 +628,7 @@ export default function ExamSimPage() {
   const isFlagged = flagged.has(current);
 
   return (
-    <div className="flex flex-col h-screen overflow-hidden bg-[#0a0a0a]">
+    <div className="flex flex-col h-dvh overflow-hidden bg-[#0a0a0a]">
 
       {/* Sticky top bar */}
       <div className="sticky top-0 z-10 flex items-center justify-between px-4 py-3 border-b border-white/8 bg-[#0d0d0d] shrink-0">
