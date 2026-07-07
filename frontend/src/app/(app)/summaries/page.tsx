@@ -1,9 +1,8 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
-import ReactMarkdown from "react-markdown";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   FileText, Sparkles, BookOpen, ChevronDown, Loader2,
-  Play, Pause, Square, Copy, Check, Download, Volume2, Save, RotateCw,
+  Play, Pause, Square, Copy, Check, Download, Volume2, Save, RotateCw, MousePointerClick,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { Subject } from "@/lib/api";
@@ -12,37 +11,73 @@ import { cn } from "@/lib/utils";
 
 const ALL = "__all__";
 
-// Strip markdown so the text reads cleanly when spoken aloud
+// ── Markdown helpers ──────────────────────────────────────────────────────────
+function stripInline(s: string): string {
+  return s
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
+    .trim();
+}
+
 function toPlainText(md: string): string {
   return md
     .replace(/```[\s\S]*?```/g, "")
-    .replace(/`([^`]+)`/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^\s*[-*]\s+/gm, "")
     .replace(/^\s*\d+\.\s+/gm, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .replace(/\n{2,}/g, ". ")
+    .split(/\n/).map((l) => stripInline(l)).join(" ")
     .replace(/\s+/g, " ")
     .trim();
 }
 
-// Split into speakable chunks — browsers choke on very long single utterances
-function chunkText(text: string): string[] {
-  const sentences = text.match(/[^.!?]+[.!?]*/g) ?? [text];
-  const chunks: string[] = [];
-  let current = "";
-  for (const s of sentences) {
-    if ((current + s).length > 200) {
-      if (current) chunks.push(current.trim());
-      current = s;
-    } else {
-      current += s;
+// Render inline **bold** inside a sentence
+function renderInline(raw: string) {
+  const parts = raw.split(/(\*\*[^*]+\*\*)/g);
+  return parts.map((p, i) => {
+    if (/^\*\*[^*]+\*\*$/.test(p)) {
+      return <strong key={i} className="text-violet-300 font-semibold">{p.slice(2, -2)}</strong>;
     }
+    return <span key={i}>{p.replace(/`([^`]+)`/g, "$1")}</span>;
+  });
+}
+
+type Seg = { id: number; raw: string };
+type Blk = { key: number; type: "h1" | "h2" | "h3" | "li" | "p"; segs: Seg[] };
+
+// Parse the summary into styled blocks + a flat list of spoken sentences.
+// Every sentence gets a stable id shared between the rendered span and the speech queue.
+function parseSummary(md: string): { blocks: Blk[]; sentences: string[] } {
+  const blocks: Blk[] = [];
+  const sentences: string[] = [];
+  let id = 0, key = 0;
+
+  for (const line of md.split(/\n/)) {
+    const t = line.trim();
+    if (!t) continue;
+
+    let type: Blk["type"] = "p";
+    let content = t;
+    if (/^###\s+/.test(t)) { type = "h3"; content = t.replace(/^###\s+/, ""); }
+    else if (/^##\s+/.test(t)) { type = "h2"; content = t.replace(/^##\s+/, ""); }
+    else if (/^#\s+/.test(t)) { type = "h1"; content = t.replace(/^#\s+/, ""); }
+    else if (/^[-*]\s+/.test(t)) { type = "li"; content = t.replace(/^[-*]\s+/, ""); }
+    else if (/^\d+\.\s+/.test(t)) { type = "li"; content = t.replace(/^\d+\.\s+/, ""); }
+
+    const parts = content.match(/[^.!?]+[.!?]*/g) ?? [content];
+    const segs: Seg[] = [];
+    for (const part of parts) {
+      const raw = part.trim();
+      const plain = stripInline(raw);
+      if (!plain) continue;
+      segs.push({ id, raw });
+      sentences.push(plain);
+      id++;
+    }
+    if (segs.length) blocks.push({ key: key++, type, segs });
   }
-  if (current.trim()) chunks.push(current.trim());
-  return chunks;
+  return { blocks, sentences };
 }
 
 export default function SummariesPage() {
@@ -55,16 +90,22 @@ export default function SummariesPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
-  const [saved, setSaved] = useState(false);      // is the shown summary persisted & unchanged?
+  const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingSaved, setLoadingSaved] = useState(false);
 
   const [speechState, setSpeechState] = useState<"idle" | "playing" | "paused">("idle");
-  const chunksRef = useRef<string[]>([]);
-  const chunkIndexRef = useRef(0);
+  const [activeId, setActiveId] = useState<number | null>(null);
+  const sentencesRef = useRef<string[]>([]);
+  const idxRef = useRef(0);
+  const genRef = useRef(0);   // generation token — invalidates callbacks from a cancelled run
   const supportsSpeech = typeof window !== "undefined" && "speechSynthesis" in window;
 
   const currentSubjectId = selected === ALL ? null : Number(selected);
+  const parsed = useMemo(() => parseSummary(summary), [summary]);
+
+  // Keep the speech queue in sync with what's on screen
+  useEffect(() => { sentencesRef.current = parsed.sentences; }, [parsed]);
 
   useEffect(() => {
     api.subjects.list().then(setSubjects).catch(() => {});
@@ -76,9 +117,60 @@ export default function SummariesPage() {
     selected === ALL ? "All Subjects" : subjects.find((s) => String(s.id) === selected)?.title ?? "Select";
 
   const stopSpeech = () => {
+    genRef.current += 1;
     if (supportsSpeech) window.speechSynthesis.cancel();
     setSpeechState("idle");
-    chunkIndexRef.current = 0;
+    setActiveId(null);
+    idxRef.current = 0;
+  };
+
+  // Core engine: speak sentence-by-sentence starting at `from`, chaining reliably.
+  const startSpeaking = (from: number) => {
+    if (!supportsSpeech || sentencesRef.current.length === 0) return;
+    window.speechSynthesis.cancel();
+    genRef.current += 1;
+    const gen = genRef.current;
+    idxRef.current = from;
+    setSpeechState("playing");
+
+    const speak = () => {
+      if (gen !== genRef.current) return;            // a newer run superseded this one
+      const arr = sentencesRef.current;
+      const i = idxRef.current;
+      if (i >= arr.length) { setSpeechState("idle"); setActiveId(null); idxRef.current = 0; return; }
+      setActiveId(i);
+      const utter = new SpeechSynthesisUtterance(arr[i]);
+      utter.rate = 1;
+      utter.pitch = 1;
+      utter.onend = () => {
+        if (gen !== genRef.current) return;          // ignore end-events from cancelled speech
+        idxRef.current += 1;
+        speak();                                     // advance unconditionally — this is the fix
+      };
+      utter.onerror = () => {
+        if (gen !== genRef.current) return;
+        idxRef.current += 1;
+        speak();
+      };
+      window.speechSynthesis.speak(utter);
+    };
+    speak();
+  };
+
+  const handlePlay = () => {
+    if (!supportsSpeech || !summary) return;
+    if (speechState === "paused") {
+      window.speechSynthesis.resume();
+      setSpeechState("playing");
+      return;
+    }
+    startSpeaking(0);
+  };
+
+  const handlePause = () => {
+    if (!supportsSpeech) return;
+    window.speechSynthesis.pause();
+    setSpeechState("paused");
   };
 
   // When the selected scope changes, load any previously saved summary for it
@@ -122,7 +214,6 @@ export default function SummariesPage() {
     setSummary("");
     setSaved(false);
     try {
-      // Gather this student's notes (flashcard Q&A) for the chosen scope
       let cards: { question: string; answer: string; subjects?: { title?: string } | null }[];
       if (selected === ALL) {
         cards = (await api.flashcards.all()) as any;
@@ -136,10 +227,7 @@ export default function SummariesPage() {
         return;
       }
 
-      const content = cards
-        .map((c) => `Q: ${c.question}\nA: ${c.answer}`)
-        .join("\n\n");
-
+      const content = cards.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n");
       const scope = selected === ALL ? "" : selectedTitle;
       const { summary: text } = await api.ai.summarize(scope, content);
       setSummary(text);
@@ -149,46 +237,6 @@ export default function SummariesPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const speakFromIndex = () => {
-    if (!supportsSpeech) return;
-    const chunks = chunksRef.current;
-    const i = chunkIndexRef.current;
-    if (i >= chunks.length) { setSpeechState("idle"); chunkIndexRef.current = 0; return; }
-    const utter = new SpeechSynthesisUtterance(chunks[i]);
-    utter.rate = 1;
-    utter.pitch = 1;
-    utter.onend = () => {
-      chunkIndexRef.current += 1;
-      if (chunkIndexRef.current < chunks.length && window.speechSynthesis.speaking !== false) {
-        speakFromIndex();
-      } else if (chunkIndexRef.current >= chunks.length) {
-        setSpeechState("idle");
-        chunkIndexRef.current = 0;
-      }
-    };
-    window.speechSynthesis.speak(utter);
-  };
-
-  const handlePlay = () => {
-    if (!supportsSpeech || !summary) return;
-    if (speechState === "paused") {
-      window.speechSynthesis.resume();
-      setSpeechState("playing");
-      return;
-    }
-    window.speechSynthesis.cancel();
-    chunksRef.current = chunkText(toPlainText(summary));
-    chunkIndexRef.current = 0;
-    setSpeechState("playing");
-    speakFromIndex();
-  };
-
-  const handlePause = () => {
-    if (!supportsSpeech) return;
-    window.speechSynthesis.pause();
-    setSpeechState("paused");
   };
 
   const copySummary = async () => {
@@ -206,6 +254,22 @@ export default function SummariesPage() {
     a.click();
     URL.revokeObjectURL(url);
   };
+
+  // Clickable sentence — starts reading from this point
+  const Sentence = ({ seg }: { seg: Seg }) => (
+    <span
+      onClick={() => startSpeaking(seg.id)}
+      title="Click to listen from here"
+      className={cn(
+        "cursor-pointer rounded px-0.5 -mx-0.5 transition-colors",
+        activeId === seg.id
+          ? "bg-violet-500/30 text-white"
+          : "hover:bg-violet-500/10"
+      )}
+    >
+      {renderInline(seg.raw)}{" "}
+    </span>
+  );
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5">
@@ -362,25 +426,29 @@ export default function SummariesPage() {
             </div>
           </div>
 
-          {/* Body */}
-          <div className="px-4 sm:px-6 py-5 text-sm leading-relaxed text-gray-200">
-            <ReactMarkdown
-              components={{
-                p: ({ children }) => <p className="mb-3 last:mb-0">{children}</p>,
-                ul: ({ children }) => <ul className="list-disc list-outside ml-4 mb-3 space-y-1.5">{children}</ul>,
-                ol: ({ children }) => <ol className="list-decimal list-outside ml-4 mb-3 space-y-1.5">{children}</ol>,
-                li: ({ children }) => <li className="leading-relaxed">{children}</li>,
-                strong: ({ children }) => <strong className="text-violet-300 font-semibold">{children}</strong>,
-                em: ({ children }) => <em className="text-gray-300 italic">{children}</em>,
-                h1: ({ children }) => <h1 className="text-lg font-bold text-white mb-2 mt-4 first:mt-0">{children}</h1>,
-                h2: ({ children }) => <h2 className="text-base font-bold text-white mb-2 mt-4 first:mt-0">{children}</h2>,
-                h3: ({ children }) => <h3 className="text-sm font-semibold text-gray-100 mb-1.5 mt-3">{children}</h3>,
-                code: ({ children }) => <code className="bg-black/40 text-violet-200 px-1.5 py-0.5 rounded text-xs font-mono">{children}</code>,
-                blockquote: ({ children }) => <blockquote className="border-l-2 border-violet-500/50 pl-3 text-gray-400 italic mb-3">{children}</blockquote>,
-              }}
-            >
-              {summary}
-            </ReactMarkdown>
+          {/* Click-to-read hint */}
+          {supportsSpeech && (
+            <div className="flex items-center gap-1.5 px-4 sm:px-6 pt-3 text-[11px] text-gray-500">
+              <MousePointerClick size={12} className="text-violet-400/70" />
+              Tip: click any sentence to start listening from there.
+            </div>
+          )}
+
+          {/* Body — clickable, highlightable sentences */}
+          <div className="px-4 sm:px-6 py-4 text-sm leading-7 text-gray-200">
+            {parsed.blocks.map((b) => {
+              const inner = b.segs.map((seg) => <Sentence key={seg.id} seg={seg} />);
+              if (b.type === "h1") return <h1 key={b.key} className="text-lg font-bold text-white mb-2 mt-4 first:mt-0">{inner}</h1>;
+              if (b.type === "h2") return <h2 key={b.key} className="text-base font-bold text-white mb-2 mt-4 first:mt-0">{inner}</h2>;
+              if (b.type === "h3") return <h3 key={b.key} className="text-sm font-semibold text-gray-100 mb-1.5 mt-3">{inner}</h3>;
+              if (b.type === "li") return (
+                <div key={b.key} className="flex gap-2 mb-1.5 pl-1">
+                  <span className="text-violet-400 shrink-0 mt-0.5">•</span>
+                  <p className="flex-1">{inner}</p>
+                </div>
+              );
+              return <p key={b.key} className="mb-3 last:mb-0">{inner}</p>;
+            })}
           </div>
         </div>
       )}
