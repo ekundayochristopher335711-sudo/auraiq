@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Bell, Search, Flame, BookOpen, Target, Zap, Upload, ArrowRight } from "lucide-react";
+import { Search, Flame, BookOpen, Target, Zap, Upload, ArrowRight } from "lucide-react";
 import Link from "next/link";
 import { OnboardingModal } from "@/components/onboarding/OnboardingModal";
+import { NotificationBell } from "@/components/dashboard/NotificationBell";
 import { ExamReadinessCard } from "@/components/dashboard/ExamReadinessCard";
 import { PerformanceChart } from "@/components/dashboard/PerformanceChart";
 import { WeaknessHeatmap } from "@/components/dashboard/WeaknessHeatmap";
@@ -23,7 +24,6 @@ export default function DashboardPage() {
   const [realSubjects, setRealSubjects]     = useState<Subject[] | null>(null);
   const [activeTab, setActiveTab]           = useState<Tab>("Overview");
   const [searchQuery, setSearchQuery]       = useState("");
-  const [showBell, setShowBell]             = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -62,6 +62,8 @@ export default function DashboardPage() {
   };
 
   const isNewUser = realSubjects !== null && realSubjects.length === 0;
+  const todayLabel = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const reviewedToday = performance_trend[performance_trend.length - 1]?.date === todayLabel;
   const filteredSubjects = searchQuery.trim()
     ? subjects.filter((s) =>
         s.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -138,83 +140,15 @@ export default function DashboardPage() {
             )}
           </div>
 
-          {/* Bell — notification panel */}
-          <div className="relative">
-            <button
-              onClick={() => setShowBell((v) => !v)}
-              className="relative w-9 h-9 rounded-xl bg-[#141414] border border-white/8 flex items-center justify-center hover:bg-white/5 transition-colors"
-            >
-              <Bell size={15} className="text-gray-400" />
-              {stats.cards_due_today > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 rounded-full bg-violet-500" />
-              )}
-            </button>
-            {showBell && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowBell(false)} />
-                <div className="absolute right-0 top-11 z-40 w-80 bg-[#1a1a1a] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                  <div className="px-4 py-3 border-b border-white/8 flex items-center justify-between">
-                    <p className="text-sm font-semibold text-white">Notifications</p>
-                    {stats.cards_due_today > 0 && (
-                      <span className="text-[10px] font-bold bg-violet-600 text-white px-1.5 py-0.5 rounded-full">{stats.cards_due_today}</span>
-                    )}
-                  </div>
-                  <div className="p-2 space-y-1">
-                    {stats.cards_due_today > 0 && (
-                      <Link href="/flashcards" onClick={() => setShowBell(false)}
-                        className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors">
-                        <div className="w-8 h-8 rounded-lg bg-violet-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                          <Zap size={14} className="text-violet-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-200 font-medium">
-                            {stats.cards_due_today} card{stats.cards_due_today !== 1 ? "s" : ""} due for review
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">Tap to start your review session now</p>
-                        </div>
-                      </Link>
-                    )}
-                    {stats.study_streak > 0 && (
-                      <div className="flex items-start gap-3 px-3 py-3 rounded-xl">
-                        <div className="w-8 h-8 rounded-lg bg-amber-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                          <Flame size={14} className="text-amber-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-200 font-medium">
-                            {stats.study_streak} day streak — keep it going!
-                          </p>
-                          <p className="text-xs text-gray-500 mt-0.5">Review today to maintain your streak</p>
-                        </div>
-                      </div>
-                    )}
-                    {subjects.some((s) => s.mastery_score < 0.4) && (
-                      <Link href="/subjects" onClick={() => setShowBell(false)}
-                        className="flex items-start gap-3 px-3 py-3 rounded-xl hover:bg-white/5 transition-colors">
-                        <div className="w-8 h-8 rounded-lg bg-red-500/15 flex items-center justify-center shrink-0 mt-0.5">
-                          <Target size={14} className="text-red-400" />
-                        </div>
-                        <div>
-                          <p className="text-sm text-gray-200 font-medium">Weak areas need attention</p>
-                          <p className="text-xs text-gray-500 mt-0.5">
-                            {subjects.filter((s) => s.mastery_score < 0.4).map((s) => s.title).join(", ")}
-                          </p>
-                        </div>
-                      </Link>
-                    )}
-                    {stats.cards_due_today === 0 && stats.study_streak === 0 && !subjects.some((s) => s.mastery_score < 0.4) && (
-                      <div className="flex flex-col items-center py-8 text-center px-4">
-                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center mb-2">
-                          <Zap size={16} className="text-emerald-400" />
-                        </div>
-                        <p className="text-sm text-gray-400 font-medium">You&apos;re all caught up!</p>
-                        <p className="text-xs text-gray-600 mt-1">No pending notifications right now.</p>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
+          {/* Bell — notification center */}
+          <NotificationBell
+            cardsDue={stats.cards_due_today}
+            streak={stats.study_streak}
+            reviewedToday={reviewedToday}
+            weakSubjects={subjects.filter((s) => s.mastery_score < 0.4).map((s) => ({ id: s.id, title: s.title }))}
+            isNewUser={isNewUser}
+            lastAccuracy={stats.last_session_accuracy}
+          />
         </div>
       </div>
 
