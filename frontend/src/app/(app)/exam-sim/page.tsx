@@ -8,7 +8,6 @@ import { Timer, Flag, ChevronLeft, ChevronRight, Play, CheckCircle, XCircle, Boo
 import { cn } from "@/lib/utils";
 
 type Phase = "setup" | "exam" | "results";
-type ExamMode = "pmp" | "ai";
 type Difficulty = "easy" | "medium" | "hard";
 
 interface Question {
@@ -20,125 +19,10 @@ interface Question {
   explanation: string;
 }
 
-// ── Mock question bank ─────────────────────────────────────────────────────────
-const MOCK_QUESTIONS: Question[] = [
-  {
-    id: 1, topic: "Risk Management",
-    question: "A project manager identifies a new risk late in the project with high probability and significant schedule impact. What is the FIRST action to take?",
-    options: [
-      "Escalate immediately to the project sponsor",
-      "Document the risk in the risk register and perform analysis",
-      "Implement a workaround to address the risk",
-      "Request a schedule change through the change control process",
-    ],
-    correct: 1,
-    explanation: "When a new risk is identified, always document it in the risk register first and analyze its probability and impact. Only after analysis can an appropriate response strategy be chosen.",
-  },
-  {
-    id: 2, topic: "Cost Control",
-    question: "A project has an EV of $80,000, AC of $95,000, and PV of $85,000. What is the Cost Performance Index (CPI)?",
-    options: ["0.84", "0.94", "1.06", "1.19"],
-    correct: 0,
-    explanation: "CPI = EV ÷ AC = $80,000 ÷ $95,000 ≈ 0.84. A CPI below 1.0 means the project is over budget — only $0.84 of planned value is delivered per $1 spent.",
-  },
-  {
-    id: 3, topic: "Stakeholder Engagement",
-    question: "A key stakeholder is consistently disengaged from project meetings and has not reviewed deliverables. What is the BEST approach?",
-    options: [
-      "Document the issue and continue without their input",
-      "Escalate to the project sponsor for intervention",
-      "Identify their concerns and adapt the engagement strategy",
-      "Remove them from the communication plan",
-    ],
-    correct: 2,
-    explanation: "The best approach is to understand the root cause of disengagement and adapt the engagement strategy accordingly. Stakeholder engagement is proactive and should be tailored to individual needs.",
-  },
-  {
-    id: 4, topic: "Agile Frameworks",
-    question: "During a Sprint Review, the product owner rejects a completed user story for an unstated business requirement. What should the Scrum Master do?",
-    options: [
-      "Add the new requirement to the current sprint",
-      "Facilitate discussion on the definition of done and clarify acceptance criteria",
-      "Document the issue and escalate to senior management",
-      "Re-plan the entire sprint to include the new requirement",
-    ],
-    correct: 1,
-    explanation: "The Scrum Master should facilitate a retrospective-style discussion to improve the acceptance criteria process. The story returns to the backlog with clearer criteria for the next sprint.",
-  },
-  {
-    id: 5, topic: "Quality Management",
-    question: "A project manager wants to identify the root cause of recurring defects accounting for 80% of quality issues. Which tool is MOST appropriate?",
-    options: [
-      "Control chart",
-      "Pareto diagram",
-      "Scatter diagram",
-      "Fishbone (Ishikawa) diagram",
-    ],
-    correct: 3,
-    explanation: "The Fishbone (Ishikawa) diagram is designed to identify root causes by exploring causal categories. The Pareto diagram identifies most frequent defects but not their root causes.",
-  },
-  {
-    id: 6, topic: "Risk Management",
-    question: "What is the primary purpose of Monte Carlo simulation in project risk management?",
-    options: [
-      "To rank risks by probability and impact",
-      "To model the probability distribution of project outcomes",
-      "To calculate the expected monetary value of risk events",
-      "To create risk response strategies for identified threats",
-    ],
-    correct: 1,
-    explanation: "Monte Carlo simulation runs thousands of iterations using probability distributions to produce a distribution of overall project outcomes — quantifying the range of possible completion dates or costs.",
-  },
-  {
-    id: 7, topic: "Stakeholder Engagement",
-    question: "Which factor should be considered FIRST when developing the communications management plan?",
-    options: [
-      "The preferred communication technology available",
-      "The stakeholders' communication requirements and preferences",
-      "The project schedule and milestone dates",
-      "The organizational communication policies",
-    ],
-    correct: 1,
-    explanation: "Communications planning starts with understanding stakeholder requirements — what they need, when, and in what format. Technology and policies are secondary to meeting stakeholder needs.",
-  },
-  {
-    id: 8, topic: "Agile Frameworks",
-    question: "What is the primary benefit of WIP (work-in-progress) limits in a Kanban board?",
-    options: [
-      "They ensure all team members have equal workloads",
-      "They prevent bottlenecks and improve flow by limiting concurrent work",
-      "They define the maximum number of items in the backlog",
-      "They set the team velocity for sprint planning",
-    ],
-    correct: 1,
-    explanation: "WIP limits prevent work from accumulating at bottlenecks, forcing the team to complete existing work before starting new tasks. This improves flow efficiency and exposes process constraints.",
-  },
-  {
-    id: 9, topic: "Cost Control",
-    question: "A project completes with AC of $1.2M against a BAC of $1.0M and final EV of $1.0M. What is the Variance at Completion (VAC)?",
-    options: ["-$200,000", "$200,000", "$0", "-$100,000"],
-    correct: 0,
-    explanation: "VAC = BAC − EAC. Since the project is complete, EAC = AC = $1.2M, so VAC = $1.0M − $1.2M = −$200,000. Negative VAC means the project finished $200,000 over budget.",
-  },
-  {
-    id: 10, topic: "Quality Management",
-    question: "A completed deliverable does not meet acceptance criteria and the project is on a tight schedule. What is the BEST course of action?",
-    options: [
-      "Deliver it and document the defect for the next phase",
-      "Seek a formal change request to lower the acceptance criteria",
-      "Rework the deliverable to meet acceptance criteria before delivering",
-      "Negotiate with the customer to accept it as-is",
-    ],
-    correct: 2,
-    explanation: "Quality cannot be compromised — if a deliverable doesn't meet acceptance criteria, it must be reworked. Schedule pressure is never justification for delivering non-conforming work.",
-  },
-];
-
 // ── Page ───────────────────────────────────────────────────────────────────────
 export default function ExamSimPage() {
   const { toast } = useToast();
   const [phase, setPhase]         = useState<Phase>("setup");
-  const [examMode] = useState<ExamMode>("ai");   // exams are always generated from the student's own subjects
   const [qCount, setQCount]       = useState<10 | 25 | 50>(10);
   const [timed, setTimed]         = useState(true);
   const [timeMins, setTimeMins]   = useState(30);
@@ -190,11 +74,6 @@ export default function ExamSimPage() {
     setTimeLeft(timeMins * 60);
     setShowReview(false);
     setPhase("exam");
-  };
-
-  const startPmpExam = () => {
-    const qs = MOCK_QUESTIONS.slice(0, Math.min(qCount, MOCK_QUESTIONS.length));
-    launchExam(qs);
   };
 
   const startAIExam = async () => {
@@ -309,7 +188,7 @@ export default function ExamSimPage() {
 
         <div className="rounded-2xl bg-[#141414] border border-white/8 p-5 space-y-5">
           {/* Subject picker (AI mode only) */}
-          {examMode === "ai" && (
+          {(
             <div>
               <p className="text-sm font-medium text-gray-300 mb-3">Select Subject</p>
               {loadingSubjects ? (
@@ -346,7 +225,7 @@ export default function ExamSimPage() {
           )}
 
           {/* Difficulty (AI mode only) */}
-          {examMode === "ai" && (
+          {(
             <div>
               <p className="text-sm font-medium text-gray-300 mb-3">Difficulty</p>
               <div className="flex gap-2">
@@ -383,11 +262,11 @@ export default function ExamSimPage() {
                       : "bg-white/3 border-white/8 text-gray-400 hover:text-gray-200 hover:border-white/15"
                   )}
                 >
-                  {n}{examMode === "ai" && n > 20 ? "*" : ""}
+                  {n}{n > 20 ? "*" : ""}
                 </button>
               ))}
             </div>
-            {examMode === "ai" && qCount > 20 && (
+            {qCount > 20 && (
               <p className="text-xs text-gray-600 mt-1.5">* AI mode is capped at 20 questions</p>
             )}
           </div>
@@ -438,16 +317,10 @@ export default function ExamSimPage() {
 
           {/* Summary */}
           <div className="rounded-xl bg-violet-500/5 border border-violet-500/15 p-4 text-sm text-gray-400 space-y-1.5">
-            {examMode === "ai" ? (
-              <>
-                <p><Sparkles size={12} className="inline mr-1.5 text-violet-400" />
-                  <span className="text-gray-300 font-medium">{Math.min(qCount, 20)} questions</span> generated by AI from "{selectedSubject?.title ?? "..."}"
-                </p>
-                <p>🎯 Difficulty: <span className="text-gray-300 capitalize">{difficulty}</span></p>
-              </>
-            ) : (
-              <p>📋 <span className="text-gray-300 font-medium">{Math.min(qCount, MOCK_QUESTIONS.length)} questions</span> from the PMP question bank</p>
-            )}
+            <p><Sparkles size={12} className="inline mr-1.5 text-violet-400" />
+              <span className="text-gray-300 font-medium">{Math.min(qCount, 20)} questions</span> generated by AI from "{selectedSubject?.title ?? "..."}"
+            </p>
+            <p>🎯 Difficulty: <span className="text-gray-300 capitalize">{difficulty}</span></p>
             <p>⏱ {timed ? `${timeMins}-minute time limit` : "No time limit — focus on understanding"}</p>
             <p>🎯 Passing score: <span className="text-gray-300">70% or above</span></p>
           </div>
@@ -459,8 +332,8 @@ export default function ExamSimPage() {
 
           {/* Start */}
           <button
-            onClick={examMode === "ai" ? startAIExam : startPmpExam}
-            disabled={generating || (examMode === "ai" && (!selectedSubject || subjects.length === 0))}
+            onClick={startAIExam}
+            disabled={generating || !selectedSubject || subjects.length === 0}
             className="w-full flex items-center justify-center gap-2 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold rounded-xl py-3 transition-colors"
           >
             {generating ? (
@@ -607,7 +480,7 @@ export default function ExamSimPage() {
             New Exam
           </button>
           <button
-            onClick={examMode === "ai" ? startAIExam : startPmpExam}
+            onClick={startAIExam}
             disabled={generating}
             className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl py-3 text-sm font-semibold transition-colors"
           >

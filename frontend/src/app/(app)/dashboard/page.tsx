@@ -266,9 +266,9 @@ export default function DashboardPage() {
 
       {/* Quick stats row — always visible */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Study Streak" value={`${stats.study_streak}d`} sub="Keep it up!" icon={Flame} color="amber" trend={12} />
+        <StatCard label="Study Streak" value={`${stats.study_streak}d`} sub="Keep it up!" icon={Flame} color="amber" />
         <StatCard label="Cards Due" value={stats.cards_due_today} sub="Review queue" icon={Zap} color="violet" />
-        <StatCard label="Last Session" value={stats.last_session_accuracy ? `${Math.round(stats.last_session_accuracy * 100)}%` : "—"} sub="Accuracy" icon={Target} color="emerald" trend={5} />
+        <StatCard label="Last Session" value={stats.last_session_accuracy ? `${Math.round(stats.last_session_accuracy * 100)}%` : "—"} sub="Accuracy" icon={Target} color="emerald" />
         <StatCard label="Subjects" value={subjects.length} sub="Active courses" icon={BookOpen} color="blue" />
       </div>
 

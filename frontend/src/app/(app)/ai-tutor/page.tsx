@@ -142,9 +142,11 @@ export default function AiTutorPage() {
   // Persist the conversation (create on first exchange, then update). Best-effort:
   // if the conversations table doesn't exist yet, the tutor still works.
   const persist = async (msgs: Message[]) => {
+    // Note: base64 images are NOT persisted — a single image is ~100KB of text
+    // and would bloat the conversations table. Resumed chats show text only.
     const payload = msgs
       .filter((m) => m.id !== "welcome")
-      .map((m) => ({ role: m.role, content: m.content, ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}) }));
+      .map((m) => ({ role: m.role, content: m.content || (m.imageUrl ? "[image]" : "") }));
     if (payload.length === 0) return;
     try {
       if (conversationId) {

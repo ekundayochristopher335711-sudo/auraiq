@@ -142,13 +142,11 @@ export async function reviewFlashcard(flashcard_id: number, quality: number) {
 
   let new_interval: number;
   if (quality < 3) {
-    new_interval = 1;
+    new_interval = 1;                                   // failed — relearn tomorrow
   } else if (interval_days <= 1) {
-    new_interval = 1;
-  } else if (interval_days === 1) {
-    new_interval = 6;
+    new_interval = 6;                                   // first successful review graduates to 6 days
   } else {
-    new_interval = Math.round(interval_days * new_ef);
+    new_interval = Math.round(interval_days * new_ef);  // subsequent reviews grow by ease factor
   }
 
   const next_review = new Date();
