@@ -91,6 +91,14 @@ export const api = {
       db.createSession(data),
   },
 
+  conversations: {
+    list: (subject?: string) => db.listConversations(subject),
+    get: (id: number) => db.getConversation(id),
+    create: (subject: string, title: string, messages: db.ChatMessage[]) => db.createConversation(subject, title, messages),
+    update: (id: number, messages: db.ChatMessage[]) => db.updateConversation(id, messages),
+    delete: (id: number) => db.deleteConversation(id),
+  },
+
   upload: {
     extract: async (file: File): Promise<{ preview: ExtractedContent; char_count: number; text: string }> => {
       const { data: { session } } = await supabase.auth.getSession();

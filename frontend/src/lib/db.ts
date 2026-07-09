@@ -171,6 +171,55 @@ export async function insertFlashcards(cards: { subject_id: number; question: st
   if (error) throw error;
 }
 
+// ── AI Tutor conversations ──────────────────────────────────────────────────
+export interface ChatMessage { role: "user" | "assistant"; content: string; imageUrl?: string }
+
+export async function listConversations(subject?: string) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  let q = supabase
+    .from("conversations")
+    .select("id, subject, title, updated_at")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false })
+    .limit(50);
+  if (subject) q = q.eq("subject", subject);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function getConversation(id: number) {
+  const { data, error } = await supabase.from("conversations").select("*").eq("id", id).single();
+  if (error) throw error;
+  return data;
+}
+
+export async function createConversation(subject: string, title: string, messages: ChatMessage[]) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Not authenticated");
+  const { data, error } = await supabase
+    .from("conversations")
+    .insert({ user_id: user.id, subject, title, messages })
+    .select("id")
+    .single();
+  if (error) throw error;
+  return data.id as number;
+}
+
+export async function updateConversation(id: number, messages: ChatMessage[]) {
+  const { error } = await supabase
+    .from("conversations")
+    .update({ messages, updated_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw error;
+}
+
+export async function deleteConversation(id: number) {
+  const { error } = await supabase.from("conversations").delete().eq("id", id);
+  if (error) throw error;
+}
+
 // ── Sessions ──────────────────────────────────────────────────────────────────
 export async function createSession(session: {
   subject_id?: number;

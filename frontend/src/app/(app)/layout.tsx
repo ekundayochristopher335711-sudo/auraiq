@@ -1,5 +1,6 @@
 "use client";
 import { useState } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { ToastProvider } from "@/context/ToastContext";
@@ -40,12 +41,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               <Menu size={20} />
             </button>
-            <div className="flex items-center gap-2">
+            <Link href="/dashboard" className="flex items-center gap-2">
               <div className="w-6 h-6 rounded-lg bg-violet-600 flex items-center justify-center">
                 <Brain size={12} className="text-white" />
               </div>
               <span className="text-white font-bold text-base tracking-tight">Recalro</span>
-            </div>
+            </Link>
           </div>
 
           <main className="flex-1 overflow-y-auto overflow-x-hidden">

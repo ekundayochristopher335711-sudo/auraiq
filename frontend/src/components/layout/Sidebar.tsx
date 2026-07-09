@@ -86,12 +86,12 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Logo + close on mobile */}
         <div className="flex items-center justify-between px-2 mb-8">
-          <div className="flex items-center gap-2.5">
+          <Link href="/dashboard" onClick={onClose} className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-lg bg-violet-600 flex items-center justify-center">
               <Brain size={16} className="text-white" />
             </div>
             <span className="text-white font-bold text-lg tracking-tight">Recalro</span>
-          </div>
+          </Link>
           <button onClick={onClose} className="lg:hidden text-gray-500 hover:text-gray-300 transition-colors">
             <X size={16} />
           </button>

@@ -50,6 +50,17 @@ create table if not exists public.summaries (
   updated_at timestamptz default now()
 );
 
+-- AI Tutor conversations (chat history, resumable per subject)
+create table if not exists public.conversations (
+  id bigserial primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  subject text,
+  title text,
+  messages jsonb not null default '[]'::jsonb,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
 -- Study sessions
 create table if not exists public.study_sessions (
   id bigserial primary key,
@@ -68,6 +79,7 @@ alter table public.subjects enable row level security;
 alter table public.flashcards enable row level security;
 alter table public.study_sessions enable row level security;
 alter table public.summaries enable row level security;
+alter table public.conversations enable row level security;
 
 -- ── RLS Policies ───────────────────────────────────────────
 -- profiles
@@ -84,6 +96,9 @@ create policy "own sessions" on public.study_sessions for all using (auth.uid() 
 
 -- summaries
 create policy "own summaries" on public.summaries for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- conversations
+create policy "own conversations" on public.conversations for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
 -- ── Auto-create profile on signup ──────────────────────────
 create or replace function public.handle_new_user()

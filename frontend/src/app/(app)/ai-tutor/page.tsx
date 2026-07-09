@@ -1,6 +1,6 @@
 "use client";
 import { useState, useRef, useEffect } from "react";
-import { Brain, Send, ChevronDown, Sparkles, BookOpen, ImagePlus, X } from "lucide-react";
+import { Brain, Send, ChevronDown, Sparkles, BookOpen, ImagePlus, X, History, Plus, Trash2, Loader2 } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import { cn } from "@/lib/utils";
 import { api } from "@/lib/api";
@@ -81,9 +81,21 @@ export default function AiTutorPage() {
   const [backendError, setBackendError]       = useState<string | null>(null);
   const [lastFailedUserMessage, setLastFailedUserMessage] = useState("");
   const [lastFailedImage, setLastFailedImage] = useState<string | null>(null);
+  const [conversationId, setConversationId] = useState<number | null>(null);
+  const [pastChats, setPastChats] = useState<{ id: number; title: string | null; updated_at: string }[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
   const messagesEndRef  = useRef<HTMLDivElement>(null);
   const inputRef        = useRef<HTMLTextAreaElement>(null);
   const fileInputRef    = useRef<HTMLInputElement>(null);
+
+  const welcomeFor = (subj: string) =>
+    subj
+      ? `Hi! I'm your AI Tutor for **${subj}**.\n\nI use the Socratic method — I'll guide you to understand concepts deeply rather than just giving you answers. Ask me to explain something, work through a practice problem, or quiz you on key topics.\n\nWhat would you like to explore?`
+      : `Hi! I'm your AI Tutor. Create a subject to get study help tailored to your course, or ask me a general study question to get started.`;
+
+  const refreshHistory = (subj: string) => {
+    api.conversations.list(subj || undefined).then((l) => setPastChats(l as any)).catch(() => setPastChats([]));
+  };
 
   useEffect(() => {
     api.subjects.list().then((s: Subject[]) => {
@@ -102,14 +114,65 @@ export default function AiTutorPage() {
     ]
     : [];
 
-  // Reset chat when subject changes
-  useEffect(() => {
-    const welcomeMessage = subject
-      ? `Hi! I'm your AI Tutor for **${subject}**.\n\nI use the Socratic method — I'll guide you to understand concepts deeply rather than just giving you answers. Ask me to explain something, work through a practice problem, or quiz you on key topics.\n\nWhat would you like to explore?`
-      : `Hi! I'm your AI Tutor. Create a subject to get study help tailored to your course, or ask me a general study question to get started.`;
-
-    setMessages([{ id: "welcome", role: "assistant", content: welcomeMessage }]);
+  const startNewChat = () => {
+    setConversationId(null);
+    setMessages([{ id: "welcome", role: "assistant", content: welcomeFor(subject) }]);
     setInput("");
+    setShowHistory(false);
+  };
+
+  const resumeChat = async (id: number) => {
+    try {
+      const convo = await api.conversations.get(id);
+      const msgs: Message[] = (convo.messages ?? []).map((m: any, i: number) => ({
+        id: `h-${id}-${i}`, role: m.role, content: m.content, imageUrl: m.imageUrl,
+      }));
+      setConversationId(id);
+      setMessages(msgs.length ? msgs : [{ id: "welcome", role: "assistant", content: welcomeFor(subject) }]);
+      setShowHistory(false);
+    } catch { /* ignore */ }
+  };
+
+  const removeChat = async (id: number) => {
+    try { await api.conversations.delete(id); } catch { /* ignore */ }
+    setPastChats((prev) => prev.filter((c) => c.id !== id));
+    if (id === conversationId) startNewChat();
+  };
+
+  // Persist the conversation (create on first exchange, then update). Best-effort:
+  // if the conversations table doesn't exist yet, the tutor still works.
+  const persist = async (msgs: Message[]) => {
+    const payload = msgs
+      .filter((m) => m.id !== "welcome")
+      .map((m) => ({ role: m.role, content: m.content, ...(m.imageUrl ? { imageUrl: m.imageUrl } : {}) }));
+    if (payload.length === 0) return;
+    try {
+      if (conversationId) {
+        await api.conversations.update(conversationId, payload as any);
+      } else {
+        const firstUser = msgs.find((m) => m.role === "user")?.content ?? "New chat";
+        const title = (firstUser || "New chat").slice(0, 60);
+        const id = await api.conversations.create(subject || "", title, payload as any);
+        setConversationId(id);
+        refreshHistory(subject);
+      }
+    } catch { /* table may not exist — ignore */ }
+  };
+
+  // When the subject changes, load its most recent conversation (resume) or start fresh
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      refreshHistory(subject);
+      try {
+        const list = await api.conversations.list(subject || undefined);
+        if (cancelled) return;
+        if (list.length > 0) { await resumeChat(list[0].id); return; }
+      } catch { /* ignore */ }
+      if (!cancelled) startNewChat();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject]);
 
   // Scroll to latest message
@@ -158,8 +221,9 @@ export default function AiTutorPage() {
       imageUrl: imageData ? imageData : imagePreview ?? undefined,
     };
     const history = messages.map((m) => ({ role: m.role, content: m.content }));
+    const withUser = [...messages, userMsg];
 
-    setMessages((prev) => [...prev, userMsg]);
+    setMessages(withUser);
     setInput("");
     setLastFailedUserMessage(msg);
     setLastFailedImage(imageData ?? imageBase64 ?? null);
@@ -171,18 +235,16 @@ export default function AiTutorPage() {
     try {
       const res = await api.ai.chat(msg, subject, history, imgB64 || undefined);
       setBackendError(null);
-      setMessages((prev) => [...prev, {
-        id: `a-${Date.now()}`,
-        role: "assistant",
-        content: res.reply,
-      }]);
+      const withReply: Message[] = [...withUser, { id: `a-${Date.now()}`, role: "assistant", content: res.reply }];
+      setMessages(withReply);
+      persist(withReply);   // save the conversation so it can be resumed later
     } catch (err: any) {
       const errorMessage = err?.message ?? "Unknown error";
       const isWakeUpError = /waking up|backend|timed out/i.test(errorMessage);
       if (isWakeUpError) {
         setBackendError(errorMessage);
       }
-      setMessages((prev) => [...prev, {
+      setMessages([...withUser, {
         id: `a-${Date.now()}`,
         role: "assistant",
         content: `⚠️ AI request failed: ${errorMessage}. Please try again.`,
@@ -220,8 +282,55 @@ export default function AiTutorPage() {
           </div>
         </div>
 
-        {/* Subject selector */}
-        <div className="relative shrink-0">
+        <div className="flex items-center gap-1.5 shrink-0">
+          {/* New chat */}
+          <button
+            onClick={startNewChat}
+            title="New chat"
+            className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#141414] border border-white/10 hover:border-white/20 text-gray-400 hover:text-violet-400 transition-colors"
+          >
+            <Plus size={15} />
+          </button>
+
+          {/* Chat history */}
+          <div className="relative">
+            <button
+              onClick={() => setShowHistory((v) => !v)}
+              title="Chat history"
+              className="w-9 h-9 flex items-center justify-center rounded-xl bg-[#141414] border border-white/10 hover:border-white/20 text-gray-400 hover:text-violet-400 transition-colors"
+            >
+              <History size={15} />
+            </button>
+            {showHistory && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowHistory(false)} />
+                <div className="absolute right-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
+                  <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
+                    {subject ? `${subject} chats` : "Chat history"}
+                  </p>
+                  {pastChats.length === 0 ? (
+                    <p className="px-3 py-3 text-xs text-gray-500">No saved chats yet</p>
+                  ) : pastChats.map((c) => (
+                    <div
+                      key={c.id}
+                      className={cn("group flex items-center gap-2 px-3 py-2 hover:bg-white/5 transition-colors", c.id === conversationId && "bg-violet-500/10")}
+                    >
+                      <button onClick={() => resumeChat(c.id)} className="flex-1 min-w-0 text-left">
+                        <p className={cn("text-xs truncate", c.id === conversationId ? "text-violet-300" : "text-gray-300")}>{c.title || "Untitled chat"}</p>
+                        <p className="text-[10px] text-gray-600">{new Date(c.updated_at).toLocaleDateString()}</p>
+                      </button>
+                      <button onClick={() => removeChat(c.id)} title="Delete" className="opacity-0 group-hover:opacity-100 text-gray-600 hover:text-red-400 transition-all shrink-0">
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Subject selector */}
+          <div className="relative">
           <button
             onClick={() => setShowSubjectMenu((v) => !v)}
             className="flex items-center gap-1.5 bg-[#141414] border border-white/10 hover:border-white/20 rounded-xl px-2.5 py-2 text-sm text-gray-300 transition-colors max-w-[160px] sm:max-w-none"
@@ -248,6 +357,7 @@ export default function AiTutorPage() {
               ))}
             </div>
           )}
+          </div>
         </div>
       </div>
 
