@@ -175,6 +175,19 @@ export default function SummariesPage() {
   const voiceRef = useRef<SpeechSynthesisVoice | null>(null);
   const supportsSpeech = typeof window !== "undefined" && "speechSynthesis" in window;
 
+  // ── HD voices (Google TTS) — real audio, background playback ──────────────
+  const [hdConfigured, setHdConfigured] = useState(false);
+  const [hdVoices, setHdVoices] = useState<{ name: string; label: string; lang: string }[]>([]);
+  const [hdVoiceName, setHdVoiceName] = useState("");
+  const [hdState, setHdState] = useState<"idle" | "loading" | "playing" | "paused">("idle");
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const hdChunksRef = useRef<string[]>([]);
+  const hdIdxRef = useRef(0);
+  const hdGenRef = useRef(0);
+  const hdCacheRef = useRef<Record<string, string[]>>({});   // {text|voice → audio chunks}
+  // Which engine is active: HD when configured AND an HD voice is chosen
+  const usingHD = hdConfigured && !!hdVoiceName;
+
   const currentSubjectId = selected === ALL ? null : Number(selected);
   const parsed = useMemo(() => parseSummary(summary), [summary]);
 
@@ -205,7 +218,18 @@ export default function SummariesPage() {
 
   useEffect(() => {
     api.subjects.list().then(setSubjects).catch(() => {});
-    return () => { if (supportsSpeech) window.speechSynthesis.cancel(); };
+    // Detect HD voices; default to the first HD voice when available
+    api.ai.ttsConfig().then((cfg) => {
+      if (cfg.configured && cfg.voices.length > 0) {
+        setHdConfigured(true);
+        setHdVoices(cfg.voices);
+        setHdVoiceName(cfg.voices[0].name);
+      }
+    }).catch(() => {});
+    return () => {
+      if (supportsSpeech) window.speechSynthesis.cancel();
+      if (audioRef.current) { audioRef.current.pause(); audioRef.current.src = ""; }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -270,26 +294,128 @@ export default function SummariesPage() {
     setSpeechState("paused");
   };
 
-  // Cycle to the next speed; if currently reading, restart the current sentence at the new speed
+  // Cycle to the next speed. HD audio changes speed live; browser speech restarts the sentence.
   const cycleSpeed = () => {
     const next = SPEEDS[(SPEEDS.indexOf(rate) + 1) % SPEEDS.length] ?? 1;
     rateRef.current = next;
     setRate(next);
-    if (speechState === "playing") startSpeaking(idxRef.current);
+    if (usingHD) {
+      if (audioRef.current) audioRef.current.playbackRate = next;
+    } else if (speechState === "playing") {
+      startSpeaking(idxRef.current);
+    }
   };
 
   const changeVoice = (v: SpeechSynthesisVoice) => {
+    stopHD();
     voiceRef.current = v;
     setVoiceURI(v.voiceURI);
+    setHdVoiceName("");          // switch to the device-voice engine
     setShowVoiceMenu(false);
     if (speechState === "playing") startSpeaking(idxRef.current);
   };
 
+  const changeHDVoice = (name: string) => {
+    stopSpeech();
+    stopHD();
+    setHdVoiceName(name);        // switch to the HD engine
+    setShowVoiceMenu(false);
+  };
+
   const currentVoice = voices.find((v) => v.voiceURI === voiceURI);
+
+  // ── HD engine ─────────────────────────────────────────────────────────────
+  const setupMediaSession = () => {
+    if (typeof navigator === "undefined" || !("mediaSession" in navigator)) return;
+    try {
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: summaryLabel || "Note Summary", artist: "Recalro", album: "Summaries",
+      });
+      navigator.mediaSession.setActionHandler("play", () => playHD());
+      navigator.mediaSession.setActionHandler("pause", () => pauseHD());
+      navigator.mediaSession.setActionHandler("stop", () => stopHD());
+    } catch { /* not supported */ }
+  };
+
+  const playHDChunk = (gen: number) => {
+    if (gen !== hdGenRef.current) return;
+    const chunks = hdChunksRef.current;
+    const i = hdIdxRef.current;
+    if (i >= chunks.length) { setHdState("idle"); hdIdxRef.current = 0; return; }
+    const audio = audioRef.current ?? (audioRef.current = new Audio());
+    audio.src = `data:audio/mp3;base64,${chunks[i]}`;
+    audio.playbackRate = rateRef.current;
+    audio.onended = () => {
+      if (gen !== hdGenRef.current) return;
+      hdIdxRef.current += 1;
+      playHDChunk(gen);
+    };
+    audio.play().catch(() => {});
+  };
+
+  const playHD = async () => {
+    if (!summary) return;
+    if (hdState === "paused" && audioRef.current) {
+      audioRef.current.play().catch(() => {});
+      setHdState("playing");
+      return;
+    }
+    const key = `${hdVoiceName}|${summary}`;
+    hdGenRef.current += 1;
+    const gen = hdGenRef.current;
+
+    // Cached this session? play instantly (no re-charge)
+    if (hdCacheRef.current[key]) {
+      hdChunksRef.current = hdCacheRef.current[key];
+      hdIdxRef.current = 0;
+      setHdState("playing");
+      setupMediaSession();
+      playHDChunk(gen);
+      return;
+    }
+
+    setHdState("loading");
+    try {
+      const { audios } = await api.ai.tts(toPlainText(summary), hdVoiceName, rate);
+      if (gen !== hdGenRef.current) return;
+      if (!audios || audios.length === 0) throw new Error("No audio returned");
+      hdCacheRef.current[key] = audios;
+      hdChunksRef.current = audios;
+      hdIdxRef.current = 0;
+      setHdState("playing");
+      setupMediaSession();
+      playHDChunk(gen);
+    } catch (err: any) {
+      setHdState("idle");
+      toast.error(err?.message ?? "HD voice failed — try a device voice.");
+    }
+  };
+
+  const pauseHD = () => {
+    audioRef.current?.pause();
+    setHdState("paused");
+    if (typeof navigator !== "undefined" && "mediaSession" in navigator) navigator.mediaSession.playbackState = "paused";
+  };
+
+  const stopHD = () => {
+    hdGenRef.current += 1;
+    if (audioRef.current) { audioRef.current.pause(); audioRef.current.currentTime = 0; }
+    setHdState("idle");
+    hdIdxRef.current = 0;
+  };
+
+  // ── Unified controls (route to whichever engine is active) ────────────────
+  const playState = usingHD ? (hdState === "loading" ? "playing" : hdState) : speechState;
+  const isLoadingAudio = usingHD && hdState === "loading";
+
+  const onPlay  = () => (usingHD ? playHD() : handlePlay());
+  const onPause = () => (usingHD ? pauseHD() : handlePause());
+  const onStop  = () => (usingHD ? stopHD() : stopSpeech());
 
   // When the selected scope changes, load any previously saved summary for it
   useEffect(() => {
     stopSpeech();
+    stopHD();
     setError("");
     setSummary("");
     setSaved(false);
@@ -323,6 +449,7 @@ export default function SummariesPage() {
 
   const generate = async () => {
     stopSpeech();
+    stopHD();
     setLoading(true);
     setError("");
     setSummary("");
@@ -378,20 +505,24 @@ export default function SummariesPage() {
   };
 
   // Clickable sentence — starts reading from this point
-  const Sentence = ({ seg }: { seg: Seg }) => (
-    <span
-      onClick={() => startSpeaking(seg.id)}
-      title="Click to listen from here"
-      className={cn(
-        "cursor-pointer rounded px-0.5 -mx-0.5 transition-colors",
-        activeId === seg.id
-          ? "bg-violet-500/30 text-white"
-          : "hover:bg-violet-500/10"
-      )}
-    >
-      {renderInline(seg.raw)}{" "}
-    </span>
-  );
+  // Click-to-read + karaoke highlight only apply to the device-voice engine.
+  const Sentence = ({ seg }: { seg: Seg }) =>
+    usingHD ? (
+      <span>{renderInline(seg.raw)}{" "}</span>
+    ) : (
+      <span
+        onClick={() => startSpeaking(seg.id)}
+        title="Click to listen from here"
+        className={cn(
+          "cursor-pointer rounded px-0.5 -mx-0.5 transition-colors",
+          activeId === seg.id
+            ? "bg-violet-500/30 text-white"
+            : "hover:bg-violet-500/10"
+        )}
+      >
+        {renderInline(seg.raw)}{" "}
+      </span>
+    );
 
   return (
     <div className="p-4 sm:p-6 max-w-3xl mx-auto space-y-5">
@@ -502,34 +633,52 @@ export default function SummariesPage() {
                   Save
                 </button>
               )}
-              {supportsSpeech && (
+              {(supportsSpeech || hdConfigured) && (
                 <>
-                  {/* Voice selector */}
-                  {voices.length > 1 && (
+                  {/* Voice selector — HD (Google) voices + device voices */}
+                  {(voices.length > 0 || hdVoices.length > 0) && (
                     <div className="relative">
                       <button
                         onClick={() => setShowVoiceMenu((v) => !v)}
                         title="Voice"
-                        className="flex items-center gap-1 text-xs font-medium text-gray-300 border border-white/10 hover:bg-white/5 rounded-lg px-2.5 py-2 transition-colors max-w-[130px]"
+                        className="flex items-center gap-1 text-xs font-medium text-gray-300 border border-white/10 hover:bg-white/5 rounded-lg px-2.5 py-2 transition-colors max-w-[150px]"
                       >
                         <AudioLines size={13} className="text-violet-400 shrink-0" />
-                        <span className="truncate">{currentVoice ? voiceLabel(currentVoice) : "Voice"}</span>
+                        <span className="truncate">
+                          {usingHD
+                            ? `${hdVoices.find((v) => v.name === hdVoiceName)?.label ?? "HD"} · HD`
+                            : currentVoice ? voiceLabel(currentVoice) : "Voice"}
+                        </span>
                         <ChevronDown size={11} className={cn("text-gray-500 transition-transform shrink-0", showVoiceMenu && "rotate-180")} />
                       </button>
                       {showVoiceMenu && (
                         <>
                           <div className="fixed inset-0 z-40" onClick={() => setShowVoiceMenu(false)} />
-                          <div className="absolute left-0 top-full mt-1.5 w-44 max-w-[calc(100vw-3rem)] bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
-                            {voices.map((v) => (
-                              <button
-                                key={v.voiceURI}
-                                onClick={() => changeVoice(v)}
-                                className={cn("w-full text-left px-3.5 py-2 text-xs transition-colors truncate",
-                                  v.voiceURI === voiceURI ? "text-violet-400 bg-violet-500/10" : "text-gray-300 hover:bg-white/5")}
-                              >
-                                {voiceLabel(v)}
-                              </button>
-                            ))}
+                          <div className="absolute left-0 top-full mt-1.5 w-52 max-w-[calc(100vw-3rem)] max-h-72 overflow-y-auto bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
+                            {hdVoices.length > 0 && (
+                              <>
+                                <p className="px-3.5 pt-1.5 pb-1 text-[10px] font-semibold uppercase tracking-wider text-violet-400/80">HD · plays in background</p>
+                                {hdVoices.map((v) => (
+                                  <button key={v.name} onClick={() => changeHDVoice(v.name)}
+                                    className={cn("w-full text-left px-3.5 py-2 text-xs transition-colors truncate",
+                                      usingHD && v.name === hdVoiceName ? "text-violet-400 bg-violet-500/10" : "text-gray-300 hover:bg-white/5")}>
+                                    {v.label}
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                            {voices.length > 0 && (
+                              <>
+                                <p className="px-3.5 pt-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-gray-500">Device voices</p>
+                                {voices.map((v) => (
+                                  <button key={v.voiceURI} onClick={() => changeVoice(v)}
+                                    className={cn("w-full text-left px-3.5 py-2 text-xs transition-colors truncate",
+                                      !usingHD && v.voiceURI === voiceURI ? "text-violet-400 bg-violet-500/10" : "text-gray-300 hover:bg-white/5")}>
+                                    {voiceLabel(v)}
+                                  </button>
+                                ))}
+                              </>
+                            )}
                           </div>
                         </>
                       )}
@@ -543,25 +692,25 @@ export default function SummariesPage() {
                     <Gauge size={13} className="text-violet-400" />
                     {rate}×
                   </button>
-                  {speechState !== "playing" ? (
+                  {playState !== "playing" ? (
                     <button
-                      onClick={handlePlay}
+                      onClick={onPlay}
                       className="flex items-center gap-1.5 text-xs font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-lg px-3 py-2 transition-colors"
                     >
-                      {speechState === "paused" ? <Play size={13} /> : <Volume2 size={13} />}
-                      {speechState === "paused" ? "Resume" : "Listen"}
+                      {playState === "paused" ? <Play size={13} /> : <Volume2 size={13} />}
+                      {playState === "paused" ? "Resume" : "Listen"}
                     </button>
                   ) : (
                     <button
-                      onClick={handlePause}
+                      onClick={isLoadingAudio ? undefined : onPause}
                       className="flex items-center gap-1.5 text-xs font-medium bg-amber-600 hover:bg-amber-500 text-white rounded-lg px-3 py-2 transition-colors"
                     >
-                      <Pause size={13} /> Pause
+                      {isLoadingAudio ? <><Loader2 size={13} className="animate-spin" /> Loading</> : <><Pause size={13} /> Pause</>}
                     </button>
                   )}
-                  {speechState !== "idle" && (
+                  {playState !== "idle" && (
                     <button
-                      onClick={stopSpeech}
+                      onClick={onStop}
                       title="Stop"
                       className="w-8 h-8 flex items-center justify-center rounded-lg border border-white/10 text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
                     >

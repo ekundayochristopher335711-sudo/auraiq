@@ -167,6 +167,16 @@ export const api = {
         method: "POST",
         body: JSON.stringify({ subject, content }),
       }),
+    ttsConfig: () =>
+      apiRequest<{ configured: boolean; voices: { name: string; label: string; lang: string }[] }>(
+        "/api/ai/tts",
+        { method: "GET" }
+      ),
+    tts: (text: string, voice: string, speakingRate: number) =>
+      apiRequest<{ audios: string[] }>("/api/ai/tts", {
+        method: "POST",
+        body: JSON.stringify({ text, voice, speakingRate }),
+      }),
   },
 
   summaries: {
