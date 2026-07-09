@@ -63,15 +63,15 @@ export async function POST(req: NextRequest) {
       .eq("id", subjectId)
       .single();
     if (subj?.content && subj.content.trim().length > 80) {
-      sourceNotes = subj.content.slice(0, 12000);
+      sourceNotes = subj.content.slice(0, 20000);
     } else {
       const { data } = await supabase
         .from("flashcards")
         .select("question, answer")
         .eq("subject_id", subjectId)
-        .limit(200);
+        .limit(300);
       if (data && data.length > 0) {
-        sourceNotes = data.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n").slice(0, 12000);
+        sourceNotes = data.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n").slice(0, 20000);
       }
     }
   }
@@ -79,13 +79,21 @@ export async function POST(req: NextRequest) {
   const jsonShape = `{"questions": [{"question": "...", "options": ["A. ...", "B. ...", "C. ...", "D. ..."], "answer": "A", "explanation": "..."}]}`;
 
   const prompt = sourceNotes
-    ? `You are an exam writer. Using ONLY the student's study notes below, write ${count} multiple choice questions (4 options each) at ${difficulty} difficulty that test understanding of THIS material. Do not introduce facts that are not supported by the notes. Vary the questions — do not simply copy the notes verbatim.
+    ? `You are an exam writer. Build a ${count}-question multiple-choice exam at ${difficulty} difficulty based on the student's study notes below.
+Coverage rules:
+- About HALF the questions must test facts, definitions and concepts stated DIRECTLY in the notes (cover as much of the material as possible, not just the start).
+- The other half may test closely RELATED concepts and reasonable real-world applications or extensions of the same topics — stay strictly on-topic and never contradict the notes.
+Format rules:
+- Every question MUST have EXACTLY 4 options.
+- The "answer" MUST be the single letter (A, B, C, or D) of the correct option.
+- Do not copy the notes verbatim — rephrase into proper exam questions.
 Study notes:
 ${sourceNotes}
 
 Return a JSON object: ${jsonShape}
 Keep each explanation to 1-2 sentences. Return only valid JSON.`
     : `Generate ${count} multiple choice questions about "${topic}" at ${difficulty} difficulty for a certification exam.
+Every question must have exactly 4 options and the "answer" must be the letter (A, B, C, or D) of the correct option.
 Return a JSON object with a "questions" array: ${jsonShape}
 Keep each explanation to 1-2 sentences. Return only valid JSON.`;
 

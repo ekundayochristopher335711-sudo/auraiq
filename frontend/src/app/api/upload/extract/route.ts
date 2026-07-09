@@ -164,7 +164,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ detail: `Could not read file: ${e?.message}` }, { status: 400 });
     }
 
-    const trimmed = rawText.trim();
+    // Light cleanup of PDF-extraction noise (excess whitespace, stray blank lines)
+    const cleaned = rawText
+      .replace(/[ \t]{2,}/g, " ")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+    const trimmed = cleaned;
     const truncated = trimmed.slice(0, 12000);
     const { client, model } = getAIClient();
 
@@ -210,7 +215,7 @@ ${truncated}`;
     const preview = JSON.parse(jsonMatch[0]);
     // Return the extracted plain text too (capped) so it can be stored on the
     // subject for full-document exam/summary generation.
-    return NextResponse.json({ preview, char_count: rawText.length, text: trimmed.slice(0, 40000) });
+    return NextResponse.json({ preview, char_count: rawText.length, text: trimmed.slice(0, 120000) });
 
   } catch (err: any) {
     console.error("[Extract] Unexpected error:", err?.message);

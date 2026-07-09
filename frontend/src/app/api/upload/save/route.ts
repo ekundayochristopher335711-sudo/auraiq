@@ -18,7 +18,7 @@ export async function POST(req: NextRequest) {
   const { preview, subjectId, content } = await req.json();
   if (!preview) return NextResponse.json({ detail: "No content provided" }, { status: 400 });
 
-  const MAX_CONTENT = 60000;   // cap accumulated source text per subject (~60 KB)
+  const MAX_CONTENT = 150000;   // cap accumulated source text per subject (~150 KB, full-document coverage)
   const incoming = typeof content === "string" ? content.trim() : "";
 
   let subject: { id: number; title: string };

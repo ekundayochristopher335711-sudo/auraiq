@@ -226,15 +226,41 @@ export default function ExamSimPage() {
         throw new Error("AI returned no questions. Try again.");
       }
 
-      const qs: Question[] = raw.map((item, idx) => ({
-        id: idx + 1,
-        topic: selectedSubject.title,
-        question: item.question,
-        // Strip "A. " prefix if present (AI sometimes includes it)
-        options: item.options.map((opt) => opt.replace(/^[A-D]\.\s*/, "")),
-        correct: item.answer.charCodeAt(0) - 65,
-        explanation: item.explanation,
-      }));
+      const qs: Question[] = raw
+        .map((item, idx) => {
+          // Normalise options — always an array of clean strings (strip "A. " prefixes)
+          const rawOpts = Array.isArray(item.options) ? item.options : [];
+          const options = rawOpts
+            .map((o) => String(o ?? "").replace(/^\s*[A-D][.)]\s*/i, "").trim())
+            .filter(Boolean);
+
+          // The correct answer may be a letter ("A") or the full option text
+          let correct = 0;
+          const ans = String(item.answer ?? "").trim();
+          if (/^[A-D]$/i.test(ans)) {
+            correct = ans.toUpperCase().charCodeAt(0) - 65;
+          } else {
+            const cleaned = ans.replace(/^\s*[A-D][.)]\s*/i, "").trim().toLowerCase();
+            const found = options.findIndex((o) => o.toLowerCase() === cleaned);
+            if (found >= 0) correct = found;
+          }
+          if (correct < 0 || correct >= options.length) correct = 0;
+
+          return {
+            id: idx + 1,
+            topic: selectedSubject.title,
+            question: String(item.question ?? "").trim(),
+            options,
+            correct,
+            explanation: String(item.explanation ?? "").trim(),
+          };
+        })
+        // Drop malformed questions (no text or fewer than 2 options) so options always render
+        .filter((q) => q.question && q.options.length >= 2);
+
+      if (qs.length === 0) {
+        throw new Error("The AI returned malformed questions. Please try again.");
+      }
 
       toast.success(`${qs.length} questions generated for "${selectedSubject.title}"`);
       launchExam(qs);
