@@ -328,20 +328,28 @@ export default function SummariesPage() {
     setSummary("");
     setSaved(false);
     try {
-      let cards: { question: string; answer: string; subjects?: { title?: string } | null }[];
-      if (selected === ALL) {
-        cards = (await api.flashcards.all()) as any;
-      } else {
-        cards = (await api.subjects.getFlashcards(Number(selected))) as any;
+      // Prefer the subject's full stored document text (richest source);
+      // fall back to its flashcards (or all flashcards for "All Subjects").
+      let content = "";
+      if (selected !== ALL) {
+        const doc = await api.subjects.getContent(Number(selected)).catch(() => "");
+        if (doc && doc.trim().length > 200) content = doc;
       }
 
-      if (!cards || cards.length === 0) {
-        setError("No notes found for this selection. Upload study material to a subject first.");
-        setLoading(false);
-        return;
+      if (!content) {
+        let cards: { question: string; answer: string }[];
+        if (selected === ALL) {
+          cards = (await api.flashcards.all()) as any;
+        } else {
+          cards = (await api.subjects.getFlashcards(Number(selected))) as any;
+        }
+        if (!cards || cards.length === 0) {
+          setError("No notes found for this selection. Upload study material to a subject first.");
+          setLoading(false);
+          return;
+        }
+        content = cards.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n");
       }
-
-      const content = cards.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n");
       const scope = selected === ALL ? "" : selectedTitle;
       const { summary: text } = await api.ai.summarize(scope, content);
       setSummary(text);

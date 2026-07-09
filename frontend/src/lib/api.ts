@@ -77,6 +77,7 @@ export const api = {
     create: (title: string, description?: string) => db.createSubject(title, description),
     delete: (id: number) => db.deleteSubject(id),
     getFlashcards: (id: number) => db.getSubjectFlashcards(id),
+    getContent: (id: number) => db.getSubjectContent(id),
   },
 
   flashcards: {

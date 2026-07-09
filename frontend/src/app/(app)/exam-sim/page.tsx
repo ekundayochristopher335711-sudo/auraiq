@@ -4,7 +4,7 @@ import Link from "next/link";
 import { api, Subject } from "@/lib/api";
 import { supabase } from "@/lib/supabaseClient";
 import { useToast } from "@/context/ToastContext";
-import { Timer, Flag, ChevronLeft, ChevronRight, Play, CheckCircle, XCircle, BookOpen, Loader2, Brain, Sparkles } from "lucide-react";
+import { Timer, Flag, ChevronLeft, ChevronRight, Play, CheckCircle, XCircle, BookOpen, Loader2, Brain, Sparkles, RotateCcw } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type Phase = "setup" | "exam" | "results";
@@ -48,6 +48,16 @@ export default function ExamSimPage() {
       .finally(() => setLoadingSubjects(false));
   }, []);
 
+  // Load any previously generated exam for this subject (retakeable offline)
+  const [savedExam, setSavedExam] = useState<Question[] | null>(null);
+  useEffect(() => {
+    if (!selectedSubject) { setSavedExam(null); return; }
+    try {
+      const raw = localStorage.getItem(`recalro_exam_${selectedSubject.id}`);
+      setSavedExam(raw ? JSON.parse(raw) : null);
+    } catch { setSavedExam(null); }
+  }, [selectedSubject]);
+
   // Countdown
   useEffect(() => {
     if (phase !== "exam" || !timed) return;
@@ -62,8 +72,9 @@ export default function ExamSimPage() {
 
   useEffect(() => {
     if (phase === "exam" && timed && timeLeft === 0 && questions.length > 0) {
-      setPhase("results");
+      submitExam();   // time's up — grade and record like a manual submit
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft, phase, timed, questions.length]);
 
   const launchExam = (qs: Question[]) => {
@@ -141,6 +152,10 @@ export default function ExamSimPage() {
         throw new Error("The AI returned malformed questions. Please try again.");
       }
 
+      // Save the generated exam so it can be retaken later — even offline
+      try { localStorage.setItem(`recalro_exam_${selectedSubject.id}`, JSON.stringify(qs)); } catch { /* storage full */ }
+      setSavedExam(qs);
+
       toast.success(`${qs.length} questions generated for "${selectedSubject.title}"`);
       launchExam(qs);
     } catch (err: any) {
@@ -152,6 +167,18 @@ export default function ExamSimPage() {
 
   const submitExam = () => {
     if (timerRef.current) clearInterval(timerRef.current);
+    // Record the exam as a study session (best-effort) so it feeds the
+    // dashboard's accuracy trend, history, and streak.
+    const correct = questions.filter((q, i) => answers[i] === q.correct).length;
+    const elapsedMins = timed
+      ? Math.max(1, Math.round((timeMins * 60 - timeLeft) / 60))
+      : Math.max(1, Math.round(questions.length / 2));
+    api.sessions.create({
+      subject_id: selectedSubject?.id,
+      duration_minutes: elapsedMins,
+      cards_reviewed: questions.length,
+      correct_answers: correct,
+    }).catch(() => {});
     setPhase("results");
   };
 
@@ -339,9 +366,19 @@ export default function ExamSimPage() {
             {generating ? (
               <><Loader2 size={16} className="animate-spin" /> Generating questions...</>
             ) : (
-              <><Play size={16} /> Start Exam</>
+              <><Play size={16} /> Start New Exam</>
             )}
           </button>
+
+          {/* Retake previously generated exam — works offline */}
+          {savedExam && savedExam.length > 0 && !generating && (
+            <button
+              onClick={() => launchExam(savedExam)}
+              className="w-full flex items-center justify-center gap-2 border border-white/10 hover:border-violet-500/40 hover:bg-violet-500/10 text-gray-300 hover:text-violet-300 text-sm font-medium rounded-xl py-3 transition-all"
+            >
+              <RotateCcw size={14} /> Retake last exam ({savedExam.length} questions · works offline)
+            </button>
+          )}
         </div>
       </div>
     );
@@ -480,11 +517,10 @@ export default function ExamSimPage() {
             New Exam
           </button>
           <button
-            onClick={startAIExam}
-            disabled={generating}
-            className="flex-1 bg-violet-600 hover:bg-violet-500 disabled:opacity-50 text-white rounded-xl py-3 text-sm font-semibold transition-colors"
+            onClick={() => launchExam(questions)}
+            className="flex-1 bg-violet-600 hover:bg-violet-500 text-white rounded-xl py-3 text-sm font-semibold transition-colors"
           >
-            {generating ? "Generating..." : "Retake"}
+            Retake Same Exam
           </button>
         </div>
       </div>

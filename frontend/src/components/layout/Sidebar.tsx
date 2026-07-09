@@ -107,10 +107,10 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
                 href={href}
                 onClick={onClose}
                 className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all",
+                  "flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm transition-all",
                   active
-                    ? "bg-violet-600/20 text-violet-400"
-                    : "text-gray-500 hover:text-gray-200 hover:bg-white/5"
+                    ? "bg-violet-600/20 text-violet-400 font-semibold ring-1 ring-violet-500/20 shadow-[0_4px_16px_-8px_rgba(124,58,237,0.5)]"
+                    : "font-medium text-gray-500 hover:text-gray-200 hover:bg-white/5"
                 )}
               >
                 <Icon size={16} className={active ? "text-violet-400" : "text-gray-500"} />

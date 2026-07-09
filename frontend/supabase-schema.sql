@@ -100,6 +100,24 @@ create policy "own summaries" on public.summaries for all using (auth.uid() = us
 -- conversations
 create policy "own conversations" on public.conversations for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- ── Study streak: +1 per new consecutive day, reset if a day is missed ──
+create or replace function public.increment_streak(uid uuid)
+returns void as $$
+declare
+  last date;
+begin
+  select last_active::date into last from public.profiles where id = uid;
+  update public.profiles set
+    study_streak = case
+      when last = current_date then study_streak          -- already counted today
+      when last = current_date - 1 then study_streak + 1  -- consecutive day
+      else 1                                              -- streak broken (or first ever)
+    end,
+    last_active = now()
+  where id = uid;
+end;
+$$ language plpgsql security definer;
+
 -- ── Auto-create profile on signup ──────────────────────────
 create or replace function public.handle_new_user()
 returns trigger as $$

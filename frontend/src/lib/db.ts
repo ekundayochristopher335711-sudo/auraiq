@@ -40,6 +40,16 @@ export async function deleteSubject(id: number) {
   if (error) throw error;
 }
 
+// Full extracted document text stored for a subject ("" if none / column absent)
+export async function getSubjectContent(id: number): Promise<string> {
+  try {
+    const { data } = await supabase.from("subjects").select("content").eq("id", id).single();
+    return ((data as any)?.content as string) ?? "";
+  } catch {
+    return "";
+  }
+}
+
 // ── Summaries ─────────────────────────────────────────────────────────────────
 export async function getSummary(subjectId: number | null) {
   const { data: { user } } = await supabase.auth.getUser();
@@ -248,17 +258,22 @@ export async function getDashboard() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const [profileRes, sessionsRes, cardsRes, subjectsRes] = await Promise.all([
+  const nowISO = new Date().toISOString();
+  const [profileRes, sessionsRes, cardsRes, subjectsRes, dueRes] = await Promise.all([
     supabase.from("profiles").select("study_streak, plan").eq("id", user.id).single(),
     supabase.from("study_sessions").select("accuracy, created_at, cards_reviewed, correct_answers").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
-    supabase.from("flashcards").select("id, next_review_at, difficulty, question, subject_id, interval_days, subjects(title)").eq("user_id", user.id),
+    // Lean aggregate query — only the 3 small fields needed for mastery/due counts
+    supabase.from("flashcards").select("subject_id, interval_days, next_review_at").eq("user_id", user.id),
     supabase.from("subjects").select("id, title, mastery_score").eq("user_id", user.id).order("mastery_score", { ascending: true }),
+    // Forecast query — just the 5 most-overdue cards with their text
+    supabase.from("flashcards").select("question, next_review_at, subjects(title)").eq("user_id", user.id).lte("next_review_at", nowISO).order("next_review_at", { ascending: true }).limit(5),
   ]);
 
   const profile = profileRes.data ?? { study_streak: 0, plan: "free" };
   const sessions = sessionsRes.data ?? [];
   const cards = cardsRes.data ?? [];
   const subjectsList = subjectsRes.data ?? [];
+  const dueCards = dueRes.data ?? [];
 
   const now = new Date();
   const cards_due_today = cards.filter((c) => c.next_review_at && new Date(c.next_review_at) <= now).length;
@@ -307,23 +322,19 @@ export async function getDashboard() {
     };
   });
 
-  // Forgetting forecast: cards that are actually DUE now (overdue) — so once the
-  // student reviews them, they drop off the list instead of lingering.
-  const forgetting_forecasts = cards
-    .filter((c) => c.next_review_at && new Date(c.next_review_at) <= now)
-    .sort((a, b) => new Date(a.next_review_at!).getTime() - new Date(b.next_review_at!).getTime())
-    .slice(0, 5)
-    .map((c) => {
-      const due = new Date(c.next_review_at!);
-      const isOverdue = due <= now;
-      const hoursLeft = isOverdue ? 0 : Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60));
-      return {
-        concept: ((c as any).question ?? "Flashcard").slice(0, 55),
-        subject: ((c as any).subjects as any)?.title ?? "General",
-        hours_until_forgotten: hoursLeft,
-        urgency: isOverdue ? "critical" : hoursLeft < 4 ? "high" : "medium",
-      };
-    });
+  // Forgetting forecast: the 5 most-overdue cards (from the dedicated lean query).
+  // Once the student reviews them they drop off the list.
+  const forgetting_forecasts = dueCards.map((c) => {
+    const due = new Date(c.next_review_at!);
+    const isOverdue = due <= now;
+    const hoursLeft = isOverdue ? 0 : Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60));
+    return {
+      concept: ((c as any).question ?? "Flashcard").slice(0, 55),
+      subject: ((c as any).subjects as any)?.title ?? "General",
+      hours_until_forgotten: hoursLeft,
+      urgency: isOverdue ? "critical" : hoursLeft < 4 ? "high" : "medium",
+    };
+  });
 
   return {
     stats: {
