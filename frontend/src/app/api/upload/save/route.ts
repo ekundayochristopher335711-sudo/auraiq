@@ -24,33 +24,33 @@ export async function POST(req: NextRequest) {
   let subject: { id: number; title: string };
 
   if (subjectId) {
-    // Append to an existing subject (RLS ensures it belongs to this user)
+    // Append to an existing subject (RLS ensures it belongs to this user).
+    // Only select core columns so this never depends on `content` existing.
     const { data, error } = await supabase
       .from("subjects")
-      .select("id, title, content")
+      .select("id, title")
       .eq("id", subjectId)
       .single();
     if (error || !data) return NextResponse.json({ detail: "Subject not found" }, { status: 404 });
     subject = data;
-
-    if (incoming) {
-      const merged = [(data as any).content ?? "", incoming].filter(Boolean).join("\n\n").slice(0, MAX_CONTENT);
-      await supabase.from("subjects").update({ content: merged }).eq("id", subjectId);
-    }
   } else {
-    // Create a new subject from the extracted content
+    // Create a new subject (without `content` — that's stored best-effort below)
     const { data, error: subjectError } = await supabase
       .from("subjects")
-      .insert({
-        title: preview.subject_title,
-        description: preview.subject_description,
-        user_id: user.id,
-        content: incoming.slice(0, MAX_CONTENT) || null,
-      })
-      .select()
+      .insert({ title: preview.subject_title, description: preview.subject_description, user_id: user.id })
+      .select("id, title")
       .single();
     if (subjectError || !data) return NextResponse.json({ detail: subjectError?.message ?? "Could not create subject" }, { status: 500 });
     subject = data;
+  }
+
+  // Store/append the extracted text — BEST EFFORT. If the `content` column
+  // hasn't been added to the DB yet, this silently no-ops so uploads still work.
+  if (incoming) {
+    const { data: cur } = await supabase.from("subjects").select("content").eq("id", subject.id).single();
+    const base = (cur as any)?.content ?? "";
+    const merged = [base, incoming].filter(Boolean).join("\n\n").slice(0, MAX_CONTENT);
+    await supabase.from("subjects").update({ content: merged }).eq("id", subject.id);
   }
 
   // Insert all flashcards from all modules
