@@ -293,7 +293,7 @@ export default function AiTutorPage() {
           </button>
 
           {/* Chat history */}
-          <div className="relative">
+          <div>
             <button
               onClick={() => setShowHistory((v) => !v)}
               title="Chat history"
@@ -304,7 +304,8 @@ export default function AiTutorPage() {
             {showHistory && (
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowHistory(false)} />
-                <div className="absolute right-0 top-full mt-1 w-64 max-h-80 overflow-y-auto bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
+                {/* Anchored to the header (right-4) so it never runs off-screen on mobile */}
+                <div className="absolute right-4 top-16 w-64 max-w-[calc(100vw-2rem)] max-h-80 overflow-y-auto bg-[#1a1a1a] border border-white/10 rounded-xl shadow-2xl z-50 py-1">
                   <p className="px-3 py-2 text-[10px] font-semibold uppercase tracking-wider text-gray-500">
                     {subject ? `${subject} chats` : "Chat history"}
                   </p>
