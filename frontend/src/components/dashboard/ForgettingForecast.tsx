@@ -47,7 +47,11 @@ export function ForgettingForecast({ forecasts, queueCount }: ForgettingForecast
             const cfg = urgencyConfig[f.urgency as keyof typeof urgencyConfig] ?? urgencyConfig.medium;
             const Icon = cfg.icon;
             return (
-              <div key={i} className={cn("flex items-center gap-3 rounded-xl p-3 border", cfg.bg, cfg.border)}>
+              <Link
+                key={i}
+                href="/flashcards"
+                className={cn("flex items-center gap-3 rounded-xl p-3 border transition-colors hover:brightness-125", cfg.bg, cfg.border)}
+              >
                 <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center shrink-0", cfg.bg)}>
                   <Icon size={15} className={cfg.color} />
                 </div>
@@ -62,7 +66,7 @@ export function ForgettingForecast({ forecasts, queueCount }: ForgettingForecast
                   </p>
                 </div>
                 <span className={cn("text-xs font-semibold shrink-0", cfg.color)}>{cfg.label}</span>
-              </div>
+              </Link>
             );
           })}
         </div>

@@ -36,7 +36,7 @@ export function TopAssetsCard({ subjects }: TopAssetsCardProps) {
             const pct = Math.round(s.mastery_score * 100);
             const positive = pct >= 50;
             return (
-              <div key={s.id} className="flex items-center gap-3">
+              <Link key={s.id} href={`/subjects/${s.id}`} className="flex items-center gap-3 rounded-lg -mx-1 px-1 py-1 hover:bg-white/5 transition-colors">
                 <div className={`w-8 h-8 rounded-full ${colors[i % colors.length]} flex items-center justify-center text-xs font-bold text-white shrink-0`}>
                   {s.title.charAt(0).toUpperCase()}
                 </div>
@@ -50,7 +50,7 @@ export function TopAssetsCard({ subjects }: TopAssetsCardProps) {
                     {positive ? <TrendingUp size={10} /> : <TrendingDown size={10} />}
                   </div>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

@@ -204,7 +204,7 @@ export async function getDashboard() {
   const [profileRes, sessionsRes, cardsRes, subjectsRes] = await Promise.all([
     supabase.from("profiles").select("study_streak, plan").eq("id", user.id).single(),
     supabase.from("study_sessions").select("accuracy, created_at, cards_reviewed, correct_answers").eq("user_id", user.id).order("created_at", { ascending: false }).limit(30),
-    supabase.from("flashcards").select("id, next_review_at, difficulty, question, subjects(title)").eq("user_id", user.id),
+    supabase.from("flashcards").select("id, next_review_at, difficulty, question, subject_id, interval_days, subjects(title)").eq("user_id", user.id),
     supabase.from("subjects").select("id, title, mastery_score").eq("user_id", user.id).order("mastery_score", { ascending: true }),
   ]);
 
@@ -216,18 +216,43 @@ export async function getDashboard() {
   const now = new Date();
   const cards_due_today = cards.filter((c) => c.next_review_at && new Date(c.next_review_at) <= now).length;
   const last_session_accuracy = sessions[0]?.accuracy ?? null;
-  const avg_mastery = sessions.length > 0
-    ? sessions.reduce((s, r) => s + (r.accuracy ?? 0), 0) / sessions.length
-    : 0;
 
   const performance_trend = sessions.slice(0, 30).reverse().map((s) => ({
     date: new Date(s.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }),
     score: Math.round((s.accuracy ?? 0) * 100),
   }));
 
-  // Real topic scores from subjects table
+  // Per-subject mastery from spaced-repetition progress: a card's review interval
+  // grows as it's remembered (~21-day interval ≈ mastered). This makes mastery and
+  // exam readiness reflect real progress and drop when a subject is deleted.
+  const agg = new Map<number, { sum: number; count: number }>();
+  for (const c of cards as any[]) {
+    if (c.subject_id == null) continue;
+    const m = Math.max(0, Math.min(1, (c.interval_days ?? 0) / 21));
+    const e = agg.get(c.subject_id) ?? { sum: 0, count: 0 };
+    e.sum += m; e.count += 1;
+    agg.set(c.subject_id, e);
+  }
+  const subjectMastery = (id: number) => {
+    const e = agg.get(id);
+    return e && e.count > 0 ? e.sum / e.count : 0;
+  };
+
+  const avg_mastery = subjectsList.length > 0
+    ? subjectsList.reduce((sum, s) => sum + subjectMastery(s.id), 0) / subjectsList.length
+    : 0;
+
+  // Keep the stored per-subject mastery in sync (best-effort, non-blocking) so the
+  // Subjects list, Top Subjects and Reports match the dashboard.
+  for (const s of subjectsList) {
+    const m = subjectMastery(s.id);
+    if (Math.abs((s.mastery_score ?? 0) - m) > 0.005) {
+      supabase.from("subjects").update({ mastery_score: m }).eq("id", s.id).then(() => {});
+    }
+  }
+
   const topic_scores = subjectsList.map((s) => {
-    const score = Math.round((s.mastery_score ?? 0) * 100);
+    const score = Math.round(subjectMastery(s.id) * 100);
     return {
       topic: s.title,
       score,
@@ -235,11 +260,10 @@ export async function getDashboard() {
     };
   });
 
-  // Real forgetting forecasts: concepts approaching their review time within the
-  // next 7 days (or already overdue) — a genuine forecast, not just today's queue.
-  const in7days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+  // Forgetting forecast: cards that are actually DUE now (overdue) — so once the
+  // student reviews them, they drop off the list instead of lingering.
   const forgetting_forecasts = cards
-    .filter((c) => c.next_review_at && new Date(c.next_review_at) <= in7days)
+    .filter((c) => c.next_review_at && new Date(c.next_review_at) <= now)
     .sort((a, b) => new Date(a.next_review_at!).getTime() - new Date(b.next_review_at!).getTime())
     .slice(0, 5)
     .map((c) => {
