@@ -138,7 +138,7 @@ const MOCK_QUESTIONS: Question[] = [
 export default function ExamSimPage() {
   const { toast } = useToast();
   const [phase, setPhase]         = useState<Phase>("setup");
-  const [examMode, setExamMode]   = useState<ExamMode>("pmp");
+  const [examMode] = useState<ExamMode>("ai");   // exams are always generated from the student's own subjects
   const [qCount, setQCount]       = useState<10 | 25 | 50>(10);
   const [timed, setTimed]         = useState(true);
   const [timeMins, setTimeMins]   = useState(30);
@@ -279,37 +279,6 @@ export default function ExamSimPage() {
         <div>
           <h1 className="text-xl font-bold text-white">Exam Simulator</h1>
           <p className="text-sm text-gray-500 mt-0.5">Practice under real exam conditions</p>
-        </div>
-
-        {/* Mode selector */}
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            onClick={() => setExamMode("pmp")}
-            className={cn(
-              "rounded-2xl border p-4 text-left transition-all",
-              examMode === "pmp"
-                ? "bg-violet-600/10 border-violet-500/40"
-                : "bg-[#141414] border-white/8 hover:border-white/15"
-            )}
-          >
-            <BookOpen size={18} className={examMode === "pmp" ? "text-violet-400" : "text-gray-500"} />
-            <p className={cn("text-sm font-semibold mt-2", examMode === "pmp" ? "text-violet-300" : "text-gray-300")}>PMP Practice</p>
-            <p className="text-xs text-gray-500 mt-0.5">Curated question bank</p>
-          </button>
-
-          <button
-            onClick={() => setExamMode("ai")}
-            className={cn(
-              "rounded-2xl border p-4 text-left transition-all",
-              examMode === "ai"
-                ? "bg-violet-600/10 border-violet-500/40"
-                : "bg-[#141414] border-white/8 hover:border-white/15"
-            )}
-          >
-            <Sparkles size={18} className={examMode === "ai" ? "text-violet-400" : "text-gray-500"} />
-            <p className={cn("text-sm font-semibold mt-2", examMode === "ai" ? "text-violet-300" : "text-gray-300")}>Your Subjects</p>
-            <p className="text-xs text-gray-500 mt-0.5">AI-generated from your notes</p>
-          </button>
         </div>
 
         <div className="rounded-2xl bg-[#141414] border border-white/8 p-5 space-y-5">
@@ -640,7 +609,7 @@ export default function ExamSimPage() {
             <ChevronLeft size={18} />
           </button>
           <span className="text-sm font-medium text-gray-300 hidden sm:inline">
-            {examMode === "ai" && selectedSubject ? selectedSubject.title : "PMP Practice Exam"}
+            {selectedSubject ? selectedSubject.title : "Exam"}
           </span>
         </div>
         <div className="flex items-center gap-3">
