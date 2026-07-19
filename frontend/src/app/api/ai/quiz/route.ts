@@ -62,8 +62,10 @@ export async function POST(req: NextRequest) {
       .select("content")
       .eq("id", subjectId)
       .single();
+    // Groq free tier allows 12k tokens/min per request (prompt + output).
+    // ~8k chars of notes ≈ 2k tokens, leaving ample room for the questions.
     if (subj?.content && subj.content.trim().length > 80) {
-      sourceNotes = subj.content.slice(0, 20000);
+      sourceNotes = subj.content.slice(0, 8000);
     } else {
       const { data } = await supabase
         .from("flashcards")
@@ -71,7 +73,7 @@ export async function POST(req: NextRequest) {
         .eq("subject_id", subjectId)
         .limit(300);
       if (data && data.length > 0) {
-        sourceNotes = data.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n").slice(0, 20000);
+        sourceNotes = data.map((c) => `Q: ${c.question}\nA: ${c.answer}`).join("\n\n").slice(0, 8000);
       }
     }
   }
@@ -97,11 +99,16 @@ Every question must have exactly 4 options and the "answer" must be the letter (
 Return a JSON object with a "questions" array: ${jsonShape}
 Keep each explanation to 1-2 sentences. Return only valid JSON.`;
 
+  // Scale the output budget with question count so prompt + output stays
+  // under Groq's free-tier 12k tokens-per-minute limit (was a flat 8000,
+  // which caused "413 Request too large" on 20-question exams).
+  const maxTokens = Math.min(6000, 300 * Math.max(1, Number(count) || 5) + 500);
+
   try {
     const response = await client.chat.completions.create({
       model,
       messages: [{ role: "user", content: prompt }],
-      max_tokens: 8000,                              // enough for 20 full questions
+      max_tokens: maxTokens,
       temperature: 0.7,
       response_format: { type: "json_object" },      // force valid JSON
     });
@@ -112,6 +119,13 @@ Keep each explanation to 1-2 sentences. Return only valid JSON.`;
     }
     return NextResponse.json(questions);
   } catch (err: any) {
-    return NextResponse.json({ detail: err.message ?? "AI error" }, { status: 500 });
+    const msg = String(err?.message ?? "");
+    if (/413|request too large|rate limit|429|TPM/i.test(msg)) {
+      return NextResponse.json(
+        { detail: "The AI is at its per-minute limit. Wait about a minute and try again — or generate a 10-question exam instead of 20." },
+        { status: 429 }
+      );
+    }
+    return NextResponse.json({ detail: msg || "AI error" }, { status: 500 });
   }
 }
